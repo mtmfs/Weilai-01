@@ -1,0 +1,19 @@
+node_modules/
+*.log
+
+# 运行时产物，不入库
+telemetry-out/
+*.local.json
+
+# 台账与本地产物（位于 flatRoot / md5fix 目录，不应入库；此处兜底）
+_video_state.json
+_video_state.json.bak-*
+index.md
+_reupload.txt
+_toupload.txt
+_passed_done.txt
+
+# 凭据，永不入库
+secrets.json
+secrets/
+.env

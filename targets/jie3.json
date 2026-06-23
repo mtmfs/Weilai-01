@@ -1,0 +1,13 @@
+{
+  "id": "jie3",
+  "role": "test",
+  "account": "捷沅3",
+  "aavid": "1849209213181706",
+  "advId": "1862076853297476",
+  "mode": "推商品",
+  "planId": "1868230520126939",
+  "port": 9222,
+  "ui": "drawer",
+  "funded": false,
+  "maxUploads": 5
+}

@@ -1,0 +1,46 @@
+{
+  "project": {
+    "name": "wei-6-18",
+    "kw": "魏文彬",
+    "flatRoot": "H:\\DD\\6-18-魏-指纹",
+    "ledgerPath": "H:\\DD\\6-18-魏-指纹\\_video_state.json"
+  },
+  "chrome": {
+    "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "profileBase": "I:\\chrome-debug-profile",
+    "flags": [
+      "--no-proxy-server",
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-session-crashed-bubble",
+      "--hide-crash-restore-bubble"
+    ]
+  },
+  "ffmpeg": {
+    "candidates": [
+      "D:\\app\\ffmpeg\\ffmpeg-8.1-essentials_build\\bin\\ffmpeg.exe",
+      "ffmpeg"
+    ]
+  },
+  "md5fix": {
+    "outDir": "I:\\md5fix"
+  },
+  "sso": {
+    "handshakeAdvId": "1862076853297476"
+  },
+  "timeouts": {
+    "perFileNoProgressSec": 90,
+    "batchStallSec": 120,
+    "keepAliveSec": 12,
+    "pollSec": 8,
+    "patientMaxMin": 45
+  },
+  "concurrency": {
+    "ffmpegWorkers": 4,
+    "auditFetch": 4,
+    "delete": 3
+  },
+  "batch": {
+    "maxPerBatch": 9
+  }
+}

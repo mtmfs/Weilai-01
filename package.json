@@ -1,0 +1,17 @@
+{
+  "name": "weilai-01",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "千川双通道过审流水线 CLI（Weilai-01）",
+  "bin": {
+    "weilai": "bin/weilai.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "status": "node bin/weilai.mjs status --json",
+    "help": "node bin/weilai.mjs --help"
+  }
+}
