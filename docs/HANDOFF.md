@@ -25,7 +25,8 @@
 **★ live 验证状态：全部通过 🎉（真账户 jie3，C 盘 0.1G 下）**
 - `ready jie3` 收敛 40s(账户=捷沅3·视图开·P5清4标签) / `sync jie3` 19s(拉审核→worklist 13重传4sealed) / `delete jie3 --dry` 18s / `cycle jie3 --skip-upload` 167s(ready→sync→delete→md5fix13→skip 全骨架) / `md5fix` 13真视频 / `status` / `close` 全部 ✓。**①五条通过标准 过 4/5。**
 - **⚠️ "C 盘满阻塞" 是误判**：真因 = `probeAccount` 读 `body.innerText`，但账户名"聚量TS-捷沅3"在**折叠的账户切换器=隐藏元素**里(innerText 取不到→'?'→E_DRIFT)。改 `outerHTML.match` 即通(b249092)。C 盘 0.1G 页面正常加载。
-- **唯一未测**：①标准#5「双实例不漂」(jie3@9222 ∥ jie6@9223)——需 jie6 专用 profile 登录，无母账号凭据没法测(环境/凭据，非代码)。
+- **★jie3 advId 修复(本程·真bug)**：`jie3.advId` 原误设成**捷沅6 的 id(1862)**，靠"暖 profile + aavid 参数"切到捷沅3——**会话一旦被重置就失灵**(握手落捷沅6→nav uni-prom?aavid=1849 被弹回捷沅6 home)。改成**捷沅3 自己的 id(1849)** → 握手直落捷沅3，冷会话也收敛(已验 ready attempt2 + sync live=238)。`jie6.advId` 本来就对(自己的1862)。这是暖 profile 长期遮住的潜伏 bug，被 jie6 实验里的会话重置揪出来。
+- **#5双实例 待办(jie6)**：凭据已就位(`secrets.json`·gitignored·`loadSecrets` 已验)，但 jie6 **冷 profile 有两道坎未解**：① **登录态探测**——fresh profile 上 `agent.oceanengine` 落地页 & `redirect/ad` 在检查点都不亮 `/login`(虽然 `business.oceanengine/login` 最终会出现，探测漏判)，→ login 步没触发 → 握手未鉴权卡死；② **jie6 创意tab 收敛**(已知遗留·未测)。**⚠️ jie6=有钱账户(投放中~49万)，本程实验中扰动过其调试会话(用的是 fresh 9223 debug profile，没碰用户真实 Chrome)——继续 jie6 要谨慎。**
 
 整体架构＝**两份计划，先①后②**（见 `docs/PLAN.md`）：① 自治基建+非上传业务（本阶段）；② 上传核心（upload/submit/bump/hold-submit，只填①预留的 `E_NOT_IMPL` 接口桩，不改①）。
 
