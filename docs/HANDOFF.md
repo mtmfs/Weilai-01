@@ -20,7 +20,7 @@
 
 ## 一句话现状
 
-**计划①「自治基建」约 85% 完成**：横切层(ready/guard) + 框架(cdp/state/config/log/concurrency) + 上传接口桩 + **非上传业务 sync/delete/md5fix** + `weilai close`(安全关调试实例) 已建、已提交。**剩 telemetry + cmds(prep/sweep/status增强) + cycle 骨架 + 测5标准 + 拆 PLAN 文档**。
+**计划①「自治基建」代码已全部建完（~95%，仅剩 live 验证）**：横切层(ready/guard/monitor+telemetry) + 框架(cdp/state/config/log/concurrency) + 非上传业务(sync/delete/md5fix) + 上传接口桩 + 全部命令(ready/status/sync/delete/md5fix/prep/cycle/monitor/stats/close) + cycle 骨架(--skip-upload) + 两份子计划文档(`PLAN-1-基建.md`/`PLAN-2-上传.md`) 均已建、已提交。**仅剩：① 清盘后 live 验证 ready/sync/delete(任务#9/#12) ② 计划②(上传核心)。**
 
 **★ live 验证状态（重要）**：`status` ✓ / `md5fix` ✓(实测改过 3 个真视频·400MB/个·并行) / `weilai close` ✓ / 热路径 `ready` ✓。**未 live 验证：`sync`、`delete`、冷启动 `ready`**（C 盘满一直阻塞浏览器测试）。清盘后**先只读跑 `sync jie3` + `delete jie3 --dry-run` 核对清单，再 `--apply`**。sync/delete 是 flat-sync/run-delete 的忠实移植，但**没在真平台跑过，可能有签名捕获/选择器的小偏差**。
 
