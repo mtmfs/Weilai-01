@@ -1,6 +1,6 @@
 // status：只读。载入配置 + 台账，输出分阶段/分通道汇总。Phase 0 不碰 Chrome。
 import { loadSystem, loadTarget } from '../../lib/config.mjs';
-import { loadLedger, summarize } from '../../lib/state.mjs';
+import { loadState, summarize, ledgerExists } from '../../lib/state.mjs';
 
 export async function runStatus({ flags, pos }) {
   const sys = loadSystem();
@@ -10,13 +10,13 @@ export async function runStatus({ flags, pos }) {
   const channels = {};
   for (const id of ids) channels[id] = loadTarget(id); // 缺字段会抛 E_CONFIG
 
-  const ledger = loadLedger(sys.project.ledgerPath);
+  const ledger = loadState(sys.project.ledgerPath);
   const sum = summarize(ledger);
 
   const report = {
     project: sys.project.name,
     ledgerPath: sys.project.ledgerPath,
-    ledgerExists: sum.exists,
+    ledgerExists: ledgerExists(sys.project.ledgerPath),
     totalVideos: sum.total,
     stages: sum.stages,
     channels: Object.fromEntries(

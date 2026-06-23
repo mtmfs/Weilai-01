@@ -15,9 +15,11 @@
 
 **语言**：你把语言决定权交给我（按我的维护成本定）。把所有优化项摊开后,它们**全是 CDP 浏览器操作或轻量编排,无 CPU 热点** → **单语言 Node 仍最优**(单工具链、可直接继承现有 .mjs)。形态从"一次性 CLI"演进成"常驻 Node 进程(监控+定时) + CLI"。唯一会推翻的情形＝将来真做 API-direct 高并发上传,届时才引 Go worker(范围外)。
 
-**R&D 命门**：延迟挂起能不能成,取决于"平台能挂多久已传完未提交的素材"——代码查不到,**Phase 1 第一件事就是 TTL 实测探针**;实测出安全窗口才转正,否则退回"逐文件即时提交"(已足够解决拖累)。
+**构建拆分（按代码切口·先①后②）**：① **自治基建**——横切层(ready 自启动 / guard 自修复 / monitor 可托管) + 框架 + 非上传业务(sync/delete/md5fix/status) + cycle 外壳；② **上传核心**——upload/submit/bump/hold-submit。代码缝＝上传接口桩；**先做①、测全绿、再做②**（详见 §十四）。
 
-**盈利模式(点7)/你跳过的点6**：分别 parked / 待你补。
+**R&D 命门**：延迟挂起能不能成,取决于"平台能挂多久已传完未提交的素材"——代码查不到,**计划② 第一件事就是 TTL 实测探针**;实测出安全窗口才转正,否则退回"逐文件即时提交"(已足够解决拖累)。
+
+**盈利模式(点7)**：parked，后续详议。
 
 ---
 
@@ -78,7 +80,7 @@
 
 ---
 
-## 五、★ session = 状态收敛聚合（需求4/5）
+## 五、★ session = 状态收敛聚合 = 横切层·上下文就绪（需求4/5；见 §九）
 
 **纠正**：session 不是不可拆的叶子。它是一长串动作、且人可能停在任意页面启动。改成**最小拆分 + 最大聚合**的三层:
 
@@ -123,7 +125,7 @@
 
 ---
 
-## 七、★ 遥测 / 监控子系统（需求10）
+## 七、★ 遥测 / 监控子系统 = 横切层之一（需求10）
 
 审核时间不定 → 用数据驱动择时。设计一个**旁路被动**子系统(实测可与操作并存、不干扰):
 
@@ -146,41 +148,66 @@
 
 ---
 
-## 九、聚合命令与四级映射（需求3）
+## 九、聚合命令 — 三丛业务 + 横切层（需求3）
 
-### 业务步骤 → 软件动作 → 局部流水线 → 全局流水线
+业务聚合按**高度**自底向上三丛：环节 → 轮 → 全局，每丛只组合下一丛（或叶子）。`ready`(上下文就绪)、`guard`(韧性)、`monitor`(遥测) 是**横切层**——正交于业务、不占聚合高度，包裹支撑所有业务丛。
 
-| 业务步 | 软件动作 | 局部流水线 | 全局角色 |
-|---|---|---|---|
-| 冷启动 | session 三层(探针+动作+调度) | `ready` | 每周期/每实例起 |
-| 同步 | 签名 list + LegoMid 审核 | `prep`/`status` | 每轮闸门 |
-| 删除 | set-opt 抓+重放 | `prep`(jie3)/`sweep`(jie6) | 上传前腾槽 |
-| 改MD5 | 并行 ffmpeg fan-out | `prep` | 产可传批次 |
-| 注入 | DOM 拦截+逐文件 setFileInputFiles | `upload` | 逐批/挂起 |
-| 提交 | 逐文件判完成→确认(可延迟) | `upload` | 落定/择时发射 |
-| 记账 | bump(+materialId) | `upload` | 提交→台账(检查点) |
-| 推送 | jie6 session+inject+submit | `deliver-round` | sealed→delivering |
-| 收敛 | 循环叶子 | `cycle` 体 | 多轮直到待上传=0 |
-
-### 命令树
+### 9.1 结构
 
 ```
-全局   cycle <target> [--channel jie3|jie6|both]   编排多轮 + 轮间人控点 + 遥测择时
-局部   ├─ ready <target>      = session 三层收敛(从任意页面到就绪)
-       ├─ status <target>     = sync(只读) + stage 汇总 + 遥测分时段统计
-       ├─ prep <target>       = sync → delete(先dry后apply) → md5fix(并行)
-       ├─ upload <target>     = inject(逐文件/流水线) → submit(逐文件超时/可延迟) → bump
-       ├─ hold-submit <target> [--at <window>]   = 延迟挂起后择时一口气提交(R&D转正后)
-       ├─ test-round(jie3)    = prep + upload(批≤5)
-       ├─ deliver-round(jie6) = ready(jie6) + sync取sealed + upload(≤2)
-       ├─ sweep(jie6)         = sync → delete
-       └─ monitor <target>    = 起旁路遥测记录(常驻,不干扰操作)
-叶子   每个探针/动作/sync/delete/md5fix/inject/submit/bump 都可单独调(调试/手动收尾)
+横切层(正交·不占高度·包裹整座业务金字塔)
+  ready/session  上下文就绪：7探针+8动作 收敛(开局/漂移时一次性建立)     [§五]
+  guard          韧性：每个碰浏览器的动作包一层(弹窗/漂移/掉登录/卡死)   [§十]
+  monitor        遥测：browser-ws 旁挂被动记录 + 分时段统计              [§七]
+══════════════════ ↑横切层 包裹 ↓业务金字塔 ══════════════════
+业务聚合(按高度·一把尺)
+  叶子(原子)   sync · delete · md5fix · inject · submit · bump
+      │聚合
+丛1 环节   prep        = sync → delete(先dry后apply) → md5fix(并行)
+           upload      = inject(逐文件/流水线) → submit(逐文件超时/可延迟) → bump
+           status      = sync(只读) + stage汇总 + 遥测分时段统计   (只读环节)
+           hold-submit = upload 的「延迟挂起→择时秒提交」变体      [§六C·R&D转正后]
+      │聚合
+丛2 轮     test-round(jie3)    = ready + prep + upload(批≤5)
+           deliver-round(jie6) = ready + sync取sealed + upload(≤2)
+           sweep(jie6)         = ready + sync → delete
+      │聚合
+丛3 全局   cycle <target>      = 多轮{test-round|deliver-round|sweep} + 轮间人控点 + 遥测择时
+```
+> 轮命令开头的 `ready` 即调用横切层 ready（每轮先确保就绪，幂等空转）；每个浏览器动作再被 `guard` 包一层；`monitor` 全程旁挂。
+
+### 9.2 业务步骤 → 软件动作 → 丛/层 → cycle 角色
+
+| 业务步 | 软件动作 | 丛/层 | 在 cycle 的角色 |
+|---|---|---|---|
+| 冷启动 | 7 探针 + 8 动作 | **横切** `ready` | 每轮/每实例先收敛 |
+| 全程韧性 | guard 包装 | **横切** `guard` | 包每个浏览器动作 |
+| 全程遥测 | browser-ws 旁挂 | **横切** `monitor` | 旁路记录·驱动择时 |
+| 同步 | 签名 list + LegoMid 审核 | 丛1 环节 `prep`/`status` | 每轮闸门 |
+| 删除 | set-opt 抓+重放 | 丛1 `prep`(jie3) / 丛2 `sweep`(jie6) | 上传前腾槽 |
+| 改MD5 | 并行 ffmpeg fan-out | 丛1 环节 `prep` | 产可传批次 |
+| 注入 | DOM 拦截+逐文件 setFileInputFiles | 丛1 环节 `upload` | 逐批/挂起 |
+| 提交 | 逐文件判完成→确认(可延迟) | 丛1 `upload`/`hold-submit` | 落定/择时发射 |
+| 记账 | bump(+materialId) | 丛1 环节 `upload` | 提交→台账(检查点) |
+| 一轮测试/投放/清理 | 打包环节 | 丛2 轮 `test-round`/`deliver-round`/`sweep` | 一轮业务 |
+| 多轮收敛 | 循环各轮 | 丛3 全局 `cycle` | 直到待上传=0,轮间人控点 |
+
+### 9.3 cycle 全局流程（⏸=审核异步人控点）
+
+```
+1. ready(jie3@9222)[, ready(jie6@9223) 若 both]
+2. test-round(jie3): prep(sync→delete→md5fix) → upload(批≤5,逐文件超时)
+3. ⏸ 审核等待(数小时) — 重跑 cycle 自动续跑(台账即检查点)
+4. re-sync(jie3) → 新过审 → stage=sealed
+5. deliver-round(jie6): sealed → upload(≤2)
+6. ⏸ 审核等待(jie6)
+7. sweep(jie6): sync → delete
+8. 收敛判定: 待上传==0 或只剩顽固冻 ? 退出0 : 回到 2
 ```
 
 ---
 
-## 十、韧性层 guard()（需求4）
+## 十、韧性层 guard() = 横切层之一（需求4）
 
 每个碰浏览器的叶子跑在 `guard()` 里;纯本地叶子跳过。
 
@@ -281,22 +308,48 @@ weilai-01/
 
 ---
 
-## 十四、执行路线（批准后做）
+## 十四、执行拆分 — 两份计划，先①后②（按代码切口，不按业务顺序）
 
-**Phase 0 — 立即交付（批准后第一步）**：`gh auth status` 验证 → `gh repo create Weilai-01 --private` → 种入 README + docs(自本 plan 派生) + 可编译骨架(config/CLI 分发/targets/system.json) → 跑通 `weilai status --json`(只读)。
+上传是最难、最碰真平台、风险最高的一段。先把「能自己起、自己救、能托管空转」的工程外壳 + 所有不碰上传的安全操作做扎实、测全绿，再把上传核心填进去。
 
-**Phase 1 — R&D + 配置骨架**：① **延迟挂起 TTL 实测探针**(决定点11能否转正);② config 载入/校验、CLI 分发、`--dry-run`/`--json`、拒中文 argv。
-**Phase 2 — 继承 + 去重 + 重构核心**：吸收 8 个重复模式进 lib;重构 sync/upload/submit/delete/md5fix;session 三层(探针+动作+ready)。
-**Phase 3 — guard + 聚合 + 上传新逻辑**：guard+退出码;`ready`/`prep`/`upload`(逐文件超时+流水线)/`test-round`/`sweep`/`status`。
-**Phase 4 — 双实例 + 遥测 + cycle**：9222/9223;telemetry 旁路记录+分时段统计;`monitor`;延迟提交择时;`cycle` 全局闭环;记 materialId。
+**切点＝代码缝（不是业务缝）**：`upload`/`submit`/`bump`/`hold-submit` 这组「上传核心」模块的**接口**。计划①把它们留成**接口桩**（定签名+返回约定，内部抛 `E_NOT_IMPL`）；计划②只**填实现**、不改①任何模块。业务上「开始上传之后」归②、其余归①——即便业务流程被切成两段，**代码缝是干净的：①能独立编译/跑/测，②是纯增量。**
 
-**里程碑**：M1 `status` 只读跑通 → M2 TTL 探针出安全窗口 + `test-round --dry` → M3 jie3 实跑一轮(逐文件超时验证不再被拖累) → M4 双实例+遥测分时段报表 → M5 `cycle`+延迟择时闭环。
+### 计划①「自治基建 + 非上传业务」（先做·先测）
+> 交付 **可自启动 / 可自修复 / 可完全托管** 的工程外壳 + 所有零上传风险的操作。
+
+- **横切层（自治三件套）**
+  - `ready`/session — **可自启动**：launch→doctor→7探针+8动作 收敛，冷态/任意页面自动到就绪。
+  - `guard` — **可自修复**：每个浏览器动作包一层，自动恢复 漂移/掉登录/弹窗/签名过期；选择器漂移大声失败给退出码。
+  - `monitor` — **可托管**：browser-ws 旁挂被动记录 + 分时段统计 + 健康自检。
+- **框架**：config(校验+profiles) / cdp(吸收 8 去重模式) / state(台账·含 `bumpUpload` 函数) / log(人看+JSON) / concurrency(限流) / CLI 分发(--dry-run/--json/拒中文)。
+- **非上传业务**：`sync`(拉审核归一) / `delete`(set-opt 重放) / `md5fix`(并行 ffmpeg) / `status`(只读汇总+遥测报表)。
+- **编排外壳**：`cycle` 骨架(轮调度+⏸人控点+续跑+退出码) + 双实例(9222/9223)；上传槽位调**接口桩**或 `--skip-upload` 空转。
+- **上传接口桩**：声明 `upload()/submit()/bump()/hold-submit()` 签名与返回约定，内部 `E_NOT_IMPL`。
+
+**①通过标准（全绿才动②）**：
+1. 冷态 `weilai ready jie3` 自启动到就绪（杀 Chrome / 停任意页 都能收敛）。
+2. `guard` 自修复：人为造 漂移/弹窗/掉登录 → 自动恢复或正确 E_码停。
+3. `sync` / `delete --dry-run` / `md5fix` / `status` 全跑通；`monitor` 出分时段报表。
+4. `cycle --skip-upload` 空转完整骨架(轮调度+人控点+退出码)，到上传桩优雅停。
+5. 双实例 9222/9223 各自 profile，顶号其一不漂另一。
+
+### 计划②「上传核心」（后做·纯增量）
+> 把 upload→submit→bump 真实实现填进①预留的接口桩，不改①。
+
+- **R&D**：延迟挂起 TTL 实测探针（决定 `hold-submit` 能否转正）。
+- **填实现**：`upload`(inject 逐文件/流水线) / `submit`(逐文件超时+可延迟挂起) / `bump`(调 `state.bumpUpload`+记 materialId) / `hold-submit`。
+- **打通**：接进 prep/test-round/deliver-round/cycle，去掉 `--skip-upload`，跑完整闭环。
+
+**②通过标准**：jie3 实跑一轮验证「已传完不再陪等 5 分钟」；双通道 `cycle` 完整闭环。
+
+### 现状与顺序
+- **Phase 0 已交付**：私库 `Weilai-01` + 骨架 + `status`（只读，97 件实测通过）。
+- **顺序：计划① 全绿 → 计划②。** 批准后我先做计划①，并在私库出两份子文档 `docs/PLAN-1-基建.md` / `docs/PLAN-2-上传.md`。
 
 ---
 
-## 十五、其他观察 / 提议 + 盈利模式（需求6/7）
+## 十五、其他观察 / 提议 + 盈利模式（需求7）
 
-**点6**：你跳过了,等你补。
 **点7 盈利模式[parked]**：① 你的"内置便宜AI key"风险是 key 被扒 → 必须配反逆向 + **服务端代理转发 key**(绝不落客户端);② 更稳是 **SaaS 服务端化**(核心编排跑你服务器、客户端只当浏览器桥,按量/席位计费,天然防逆向且控量);③ 令牌按**成功过审数/上传量**计费(与客户收益挂钩,比纯时长好卖);④ 审计日志/水印做合规卖点。后续详议。
 
 **附带改进**：① **记 materialId 进台账**(点7最优解,已纳入 bump/sync)——之后直接按 mid 查审核,绕开 list 筛选脆弱性;② 台账**原子写(临时文件→rename)+备份**(现状覆盖写不抗崩溃);③ **选择器集中 + `weilai selftest`**(破坏性运行前先验选择器漂移);④ **凭据不进仓库**(母账号密码放本地未跟踪 secrets/环境变量)。

@@ -2,6 +2,7 @@
 // Weilai-01 CLI 入口：解析 argv、护栏、分发子命令。
 // 护栏：拒绝非 ASCII argv（中文走 targets/*.json，不走命令行）→ exit 2 (E_USAGE)。
 import { runStatus } from './cmds/status.mjs';
+import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 
@@ -86,9 +87,10 @@ async function main() {
   try {
     await entry.run({ flags, pos: pos.slice(1) });
   } catch (e) {
-    if (e && e.code === 'E_CONFIG') {
-      console.error(`[E_CONFIG] ${e.message}`);
-      process.exit(EXIT.CONFIG);
+    const code = e && e.code;
+    if (code && CODE_TO_EXIT[code] !== undefined) {
+      console.error(`[${code}] ${e.message}`);
+      process.exit(CODE_TO_EXIT[code]);
     }
     console.error(`[ERROR] ${(e && e.stack) || e}`);
     process.exit(EXIT.RUNTIME);
