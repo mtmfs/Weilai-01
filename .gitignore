@@ -3,6 +3,7 @@ node_modules/
 
 # 运行时产物，不入库
 telemetry-out/
+test-out/
 *.local.json
 
 # 台账与本地产物（位于 flatRoot / md5fix 目录，不应入库；此处兜底）
