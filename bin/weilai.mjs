@@ -4,6 +4,11 @@
 import { runStatus } from './cmds/status.mjs';
 import { runReady } from './cmds/ready.mjs';
 import { runClose } from './cmds/close.mjs';
+import { runSyncCmd } from './cmds/sync.mjs';
+import { runDeleteCmd } from './cmds/delete.mjs';
+import { runMd5fixCmd } from './cmds/md5fix.mjs';
+import { runPrep } from './cmds/prep.mjs';
+import { runCycle } from './cmds/cycle.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
@@ -13,14 +18,17 @@ const COMMANDS = {
   status: { phase: 0, run: runStatus, help: '只读：台账分阶段汇总（支持 --json）' },
   ready: { phase: 2, run: runReady, help: 'session 收敛到上传就绪（从任意页面，可自启动）' },
   close: { phase: 1, run: runClose, help: '优雅关闭目标通道的调试 Chrome（CDP Browser.close，只关该实例·绝不碰别的 chrome）' },
-  prep: { phase: 3, help: 'sync → delete(先 --dry-run) → md5fix' },
+  sync: { phase: 3, run: runSyncCmd, help: '拉平台审核归台账（读平台+写台账，不动平台）' },
+  delete: { phase: 3, run: runDeleteCmd, help: '删过审+被拒副本（★默认 dry-run，--apply 才真删）' },
+  md5fix: { phase: 3, run: runMd5fixCmd, help: '对待传/重传清单改 MD5（并行，纯本地）' },
+  prep: { phase: 3, run: runPrep, help: 'sync → delete(先dry后apply) → md5fix' },
   upload: { phase: 3, help: 'inject → submit(逐文件超时) → bump' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
   'test-round': { phase: 3, help: 'jie3 一轮：prep + upload' },
   'deliver-round': { phase: 4, help: 'jie6 一轮：ready + 取 sealed + upload' },
   sweep: { phase: 3, help: 'jie6：sync → delete' },
   monitor: { phase: 4, help: '起旁路遥测记录（常驻、不干扰操作）' },
-  cycle: { phase: 4, help: '全局编排多轮 + 轮间人控点 + 遥测择时' },
+  cycle: { phase: 4, run: runCycle, help: '全局编排骨架: ready→sync→delete→md5fix→[upload]; --skip-upload 跳过上传' },
 };
 
 function parseArgs(argv) {
@@ -46,7 +54,7 @@ function usage() {
     '命令:',
   ];
   for (const [name, c] of Object.entries(COMMANDS)) {
-    const tag = c.phase === 0 ? '可用 ' : `P${c.phase}骨架`;
+    const tag = c.run ? '可用  ' : `P${c.phase}骨架`;
     lines.push(`  ${name.padEnd(15)} [${tag}] ${c.help}`);
   }
   lines.push('', 'target: jie3 | jie6 | both（默认 both）', '退出码对照见 docs/RECOVERY.md');
