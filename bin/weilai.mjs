@@ -2,6 +2,7 @@
 // Weilai-01 CLI 入口：解析 argv、护栏、分发子命令。
 // 护栏：拒绝非 ASCII argv（中文走 targets/*.json，不走命令行）→ exit 2 (E_USAGE)。
 import { runStatus } from './cmds/status.mjs';
+import { runReady } from './cmds/ready.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
@@ -9,7 +10,7 @@ const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 // 命令注册表。phase 标注实现进度；run 为 undefined 即骨架占位。
 const COMMANDS = {
   status: { phase: 0, run: runStatus, help: '只读：台账分阶段汇总（支持 --json）' },
-  ready: { phase: 2, help: 'session 三层收敛到上传就绪（从任意页面）' },
+  ready: { phase: 2, run: runReady, help: 'session 收敛到上传就绪（从任意页面，可自启动）' },
   prep: { phase: 3, help: 'sync → delete(先 --dry-run) → md5fix' },
   upload: { phase: 3, help: 'inject → submit(逐文件超时) → bump' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
