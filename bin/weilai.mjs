@@ -9,6 +9,8 @@ import { runDeleteCmd } from './cmds/delete.mjs';
 import { runMd5fixCmd } from './cmds/md5fix.mjs';
 import { runPrep } from './cmds/prep.mjs';
 import { runCycle } from './cmds/cycle.mjs';
+import { runMonitor } from './cmds/monitor.mjs';
+import { runStatsCmd } from './cmds/stats.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
@@ -27,7 +29,8 @@ const COMMANDS = {
   'test-round': { phase: 3, help: 'jie3 一轮：prep + upload' },
   'deliver-round': { phase: 4, help: 'jie6 一轮：ready + 取 sealed + upload' },
   sweep: { phase: 3, help: 'jie6：sync → delete' },
-  monitor: { phase: 4, help: '起旁路遥测记录（常驻、不干扰操作）' },
+  monitor: { phase: 4, run: runMonitor, help: '起旁路遥测录制（常驻·跨所有标签被动·不干扰操作）' },
+  stats: { phase: 4, run: runStatsCmd, help: '读录制 JSONL 出分时段请求/端点/时长报表' },
   cycle: { phase: 4, run: runCycle, help: '全局编排骨架: ready→sync→delete→md5fix→[upload]; --skip-upload 跳过上传' },
 };
 
