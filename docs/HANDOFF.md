@@ -14,12 +14,15 @@
 2. **台账在满盘 H: 上**：`H:\DD\6-18-魏-指纹\_video_state.json`。`saveState` 已用**原子写(临时文件→rename)+ `.bak` 备份**，最坏是「新状态存不进」而非「毁掉旧台账」，但 **H: 满会让任何记账(bump/observe 落盘)报错**。清 H: 后才能跑写台账的流程。
 3. **热路径是好的**：当 Chrome 已开、捷沅3(1849)标签已加载好时，`weilai ready jie3` 空转/收敛都正确（已实测）。问题**只**在冷启动新建标签 + 磁盘满。
 4. **不要在没清盘前怀疑 ready 的代码**——它已被混沌测试验证、并修过 3 轮 bug。
+5. **★铁律：绝不用 `Stop-Process chrome` / `taskkill /IM chrome.exe` 重置浏览器。** 它会杀光用户的**正常 Chrome**（不止调试实例），且 `-Force` 强杀触发 Chrome **Crashpad 崩溃转储**狂写 C 盘——这正是本次 C 盘被填满 + renderer 挂死的**人为推手**。要重置调试实例只用 **`weilai close <target>`**（CDP `Browser.close`，只关该 port、保登录态、零崩溃转储）或直接重起。CLI/测试代码本身**不含任何杀进程逻辑**，这条只针对人/agent 的临时命令。
 
 ---
 
 ## 一句话现状
 
-**计划①「自治基建」约 70% 完成**：横切层(ready/guard) + 框架(cdp/state/config/log/concurrency) + 上传接口桩 已建、已混沌实测、已提交。**剩 sync/delete/md5fix/telemetry/cycle 未建**。`status` 命令实测读真台账 97 件 ✓。
+**计划①「自治基建」约 85% 完成**：横切层(ready/guard) + 框架(cdp/state/config/log/concurrency) + 上传接口桩 + **非上传业务 sync/delete/md5fix** + `weilai close`(安全关调试实例) 已建、已提交。**剩 telemetry + cmds(prep/sweep/status增强) + cycle 骨架 + 测5标准 + 拆 PLAN 文档**。
+
+**★ live 验证状态（重要）**：`status` ✓ / `md5fix` ✓(实测改过 3 个真视频·400MB/个·并行) / `weilai close` ✓ / 热路径 `ready` ✓。**未 live 验证：`sync`、`delete`、冷启动 `ready`**（C 盘满一直阻塞浏览器测试）。清盘后**先只读跑 `sync jie3` + `delete jie3 --dry-run` 核对清单，再 `--apply`**。sync/delete 是 flat-sync/run-delete 的忠实移植，但**没在真平台跑过，可能有签名捕获/选择器的小偏差**。
 
 整体架构＝**两份计划，先①后②**（见 `docs/PLAN.md`）：① 自治基建+非上传业务（本阶段）；② 上传核心（upload/submit/bump/hold-submit，只填①预留的 `E_NOT_IMPL` 接口桩，不改①）。
 

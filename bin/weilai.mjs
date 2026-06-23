@@ -3,6 +3,7 @@
 // 护栏：拒绝非 ASCII argv（中文走 targets/*.json，不走命令行）→ exit 2 (E_USAGE)。
 import { runStatus } from './cmds/status.mjs';
 import { runReady } from './cmds/ready.mjs';
+import { runClose } from './cmds/close.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
@@ -11,6 +12,7 @@ const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 const COMMANDS = {
   status: { phase: 0, run: runStatus, help: '只读：台账分阶段汇总（支持 --json）' },
   ready: { phase: 2, run: runReady, help: 'session 收敛到上传就绪（从任意页面，可自启动）' },
+  close: { phase: 1, run: runClose, help: '优雅关闭目标通道的调试 Chrome（CDP Browser.close，只关该实例·绝不碰别的 chrome）' },
   prep: { phase: 3, help: 'sync → delete(先 --dry-run) → md5fix' },
   upload: { phase: 3, help: 'inject → submit(逐文件超时) → bump' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
