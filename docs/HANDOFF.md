@@ -20,9 +20,12 @@
 
 ## 一句话现状
 
-**计划①「自治基建」代码已全部建完（~95%，仅剩 live 验证）**：横切层(ready/guard/monitor+telemetry) + 框架(cdp/state/config/log/concurrency) + 非上传业务(sync/delete/md5fix) + 上传接口桩 + 全部命令(ready/status/sync/delete/md5fix/prep/cycle/monitor/stats/close) + cycle 骨架(--skip-upload) + 两份子计划文档(`PLAN-1-基建.md`/`PLAN-2-上传.md`) 均已建、已提交。**仅剩：① 清盘后 live 验证 ready/sync/delete(任务#9/#12) ② 计划②(上传核心)。**
+**计划①「自治基建」代码已全部建完（~95%，仅剩 live 验证）**：横切层(ready/guard/monitor+telemetry) + 框架(cdp/state/config/log/concurrency) + 非上传业务(sync/delete/md5fix) + 上传接口桩 + 全部命令(ready/status/sync/delete/md5fix/prep/cycle/monitor/stats/close) + cycle 骨架(--skip-upload) + 两份子计划文档(`PLAN-1-基建.md`/`PLAN-2-上传.md`) 均已建、已提交、**已 live 验证通过 🎉**。**仅剩：① ①标准#5「双实例不漂」(需 jie6 profile 登录·无凭据) ② 计划②(上传核心·填 upload/submit 桩)。**
 
-**★ live 验证状态（重要）**：`status` ✓ / `md5fix` ✓(实测改过 3 个真视频·400MB/个·并行) / `weilai close` ✓ / 热路径 `ready` ✓。**未 live 验证：`sync`、`delete`、冷启动 `ready`**（C 盘满一直阻塞浏览器测试）。清盘后**先只读跑 `sync jie3` + `delete jie3 --dry-run` 核对清单，再 `--apply`**。sync/delete 是 flat-sync/run-delete 的忠实移植，但**没在真平台跑过，可能有签名捕获/选择器的小偏差**。
+**★ live 验证状态：全部通过 🎉（真账户 jie3，C 盘 0.1G 下）**
+- `ready jie3` 收敛 40s(账户=捷沅3·视图开·P5清4标签) / `sync jie3` 19s(拉审核→worklist 13重传4sealed) / `delete jie3 --dry` 18s / `cycle jie3 --skip-upload` 167s(ready→sync→delete→md5fix13→skip 全骨架) / `md5fix` 13真视频 / `status` / `close` 全部 ✓。**①五条通过标准 过 4/5。**
+- **⚠️ "C 盘满阻塞" 是误判**：真因 = `probeAccount` 读 `body.innerText`，但账户名"聚量TS-捷沅3"在**折叠的账户切换器=隐藏元素**里(innerText 取不到→'?'→E_DRIFT)。改 `outerHTML.match` 即通(b249092)。C 盘 0.1G 页面正常加载。
+- **唯一未测**：①标准#5「双实例不漂」(jie3@9222 ∥ jie6@9223)——需 jie6 专用 profile 登录，无母账号凭据没法测(环境/凭据，非代码)。
 
 整体架构＝**两份计划，先①后②**（见 `docs/PLAN.md`）：① 自治基建+非上传业务（本阶段）；② 上传核心（upload/submit/bump/hold-submit，只填①预留的 `E_NOT_IMPL` 接口桩，不改①）。
 
