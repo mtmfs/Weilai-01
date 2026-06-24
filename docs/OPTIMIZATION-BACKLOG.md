@@ -8,12 +8,12 @@
 - **A 系列 10 个 bug**：✅ 全修，离线 12 单测 + live 全链验证（`85d09a1`，部分随 perf 提交）。
 - **C2 / C3 / C4 提速**：✅ 完成并 live 验证（`d2aec32`），sync `19s→10.9s`。
 - **S5 Thompson bandit**：✅ 模块完成、离线单测 7/7（`13ad129`）；**未接线**（消费方=hold-submit，Phase 3/4）。
-- **Phase 1（C1/C5/S8 ready 收敛提速）**：🟡 **代码完成并提交**（`4dad860`），**但提速幅度未验证**——首次冷启动 39s≈基线，分段计时诊断撞上 **C: 满盘（0.1GB）WerFault** 而中断。代码安全（`waitFor` 超时兜底=原值；已验冷启动收敛正确 attempt1）。
+- **Phase 1（C1/C5/S8 ready 收敛提速）**：✅ **代码完成并 live 验证**（`4dad860`，2026-06-24 清盘后 jie3 真账户复测）。**冷启动 32.1s**（attempt1 一次过·账户✓·视图开，vs 基线≈39s）｜**热路径 0.9s**（S8 probeSnapshot 空转 skipped）｜**仅抽屉关 1.4s**（C5 `open-view-only`·不重握手）。冷启动未达 ~15s 目标——余下耗时＝Chrome 启动 8s + 冷握手/建标签/等账户 16s（基本不可压、非代码问题）；C1/C5/S8 真实收益在温/热/抽屉关路径：**操作者日常 re-ready 从 ~40s 塌到 ~1s**。同轮只读链路全过（`sync --no-mutate` live=315 / `delete --dry-run` 将删0 / 台账字节·mtime 未变 / `close` 优雅关）。
 - **S1 及之后**：⬜ 未开始。
 
-## ⛔ 当前头号阻塞
+## ✅ 头号阻塞已解（2026-06-24）
 
-**C: 仅剩 0.1GB**。冷启动 Chrome 触发 `WerFault.exe 0xc0000142`（DLL init 失败=资源耗尽）。**清出几 GB（C: 与 H:）前，任何需要起 Chrome 的 live 验证都不可信**。铁律：绝不 `taskkill chrome`（触发 Crashpad 转储反噬 C:），只用 `weilai close <ch>`。
+磁盘已清至可操作（C: ~1.1G / H: ~2.7G / I: 59G）。Phase 1 冷启动 live 复测**全程无 WerFault**、ready attempt1 一次过——满盘阻塞解除。铁律不变：绝不 `taskkill chrome`（触发 Crashpad 转储反噬 C:），只用 `weilai close <ch>`。⚠️ 注：真上传（计划②）写盘量大（md5fix 单件 ~400MB、全量 ~40GB），届时仍须先腾更多 C:/H:。
 
 ---
 
@@ -21,11 +21,11 @@
 
 | 编号 | 内容 | 改动量 | 架构 | 状态 |
 |---|---|---|---|---|
-| C1 | 盲等 sleep → `waitFor` 轮询（session.mjs 6+ 处 nav/点击后固定 sleep） | 中 | 局部 | 🟡 已码（`4dad860`），**提速待复测** |
+| C1 | 盲等 sleep → `waitFor` 轮询（session.mjs 6+ 处 nav/点击后固定 sleep） | 中 | 局部 | ✅ **live 验证**（冷启 32s<39s 基线·各段早返；超时兜底=原值不退化） |
 | C2 | sync 审核批 串行 → 4 并发 | 小 | 无 | ✅ 完成 |
 | C3 | `captureListSigs` 捕到即返回（14s→~3-5s） | 小 | 无 | ✅ 完成 |
 | C4 | `md5short` 整文件读 → 流式哈希 | 小 | 无 | ✅ 完成 |
-| C5 | ready 热路径加「抽屉关 → 只 openView」轻量分支 | 小-中 | 局部 | 🟡 已码（`4dad860`），**待验证** |
+| C5 | ready 热路径加「抽屉关 → 只 openView」轻量分支 | 小-中 | 局部 | ✅ **live 验证**（仅抽屉关 1.4s·`open-view-only`·不重握手） |
 
 ## S 系列
 
@@ -38,14 +38,14 @@
 | **S5** | Thompson 采样择时（Beta-Bernoulli，24 时段臂） | 小 | 局部 | ✅ **模块完成**（`lib/bandit.mjs`，离线验）；待接 hold-submit |
 | S6 | 上传前 ffprobe 预校验筛必拒件 | 小-中 | 局部 | ⬜ 需平台必拒阈值（领域数据） |
 | S7 | 重试预算 maxUploads 固定 → 按 pass_rate 优化广度/深度 | 小 | 局部 | ⬜ 需 pass_rate 数据 |
-| S8 | 探针合并 `probeSnapshot`（一次往返拿 acc/url/view/plan） | 小 | 无-局部 | 🟡 已码（`4dad860`），随 C1/C5 一起待验 |
+| S8 | 探针合并 `probeSnapshot`（一次往返拿 acc/url/view/plan） | 小 | 无-局部 | ✅ **live 验证**（热路径 0.9s 空转 skipped） |
 | S9 | API-direct 上传（复现 VOD 签名并行推字节，替代串行 DOM 文件选择器） | 大 | 重大 | ⬜ 最高天花板/风险，长期 R&D |
 
 ---
 
 ## 阶段路线图（按依赖/风险）
 
-1. **Phase 1 = C1+C5+S8**（ready 收敛提速）→ 已码，**待清盘后用 `backup/verify-phase1.mjs` 分段计时复测提速**；不达标则诊断 `waitFor` 谓词。
+1. **Phase 1 = C1+C5+S8**（ready 收敛提速）→ ✅ **已 live 验证**（2026-06-24 清盘后 jie3 真账户，`backup/verify-phase1.mjs` 分段计时：冷启 32.1s / 热 0.9s / 抽屉关 1.4s）。冷启动短于 15s 目标的部分＝Chrome 启动+冷握手不可压；温/热路径已塌到 ~1s。**Phase 1 收官，下一步＝ Phase 2（S1 mid 增量同步）**。
 2. **Phase 2 = S1**（mid 增量同步）→ 独立、可 live 对账验，性价比最高。
 3. **Phase 3 = S3 → S2**（上传核心=计划②）+ 建 `submissions.jsonl` pass-rate 基建。碰真上传，先 jie3 后 jie6。
 4. **Phase 4 = S5 接线 + S7 + S6**（数据驱动，依赖 Phase 3 产出 pass-rate）。
