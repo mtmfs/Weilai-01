@@ -8,6 +8,7 @@ import { runSyncCmd } from './cmds/sync.mjs';
 import { runDeleteCmd } from './cmds/delete.mjs';
 import { runMd5fixCmd } from './cmds/md5fix.mjs';
 import { runPrep } from './cmds/prep.mjs';
+import { runUploadCmd } from './cmds/upload.mjs';
 import { runCycle } from './cmds/cycle.mjs';
 import { runMonitor } from './cmds/monitor.mjs';
 import { runStatsCmd } from './cmds/stats.mjs';
@@ -24,7 +25,7 @@ const COMMANDS = {
   delete: { phase: 3, run: runDeleteCmd, help: '删过审+被拒副本（★默认 dry-run，--apply 才真删）' },
   md5fix: { phase: 3, run: runMd5fixCmd, help: '对待传/重传清单改 MD5（并行，纯本地）' },
   prep: { phase: 3, run: runPrep, help: 'sync → delete(先dry后apply) → md5fix' },
-  upload: { phase: 3, help: 'inject → submit(逐文件超时) → bump' },
+  upload: { phase: 3, run: runUploadCmd, help: 'inject → submit(逐文件超时) → bump（★会真上传到平台）' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
   'test-round': { phase: 3, help: 'jie3 一轮：prep + upload' },
   'deliver-round': { phase: 4, help: 'jie6 一轮：ready + 取 sealed + upload' },

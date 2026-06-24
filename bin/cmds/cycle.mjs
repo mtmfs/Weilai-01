@@ -6,7 +6,7 @@ import { runSync } from '../../lib/sync.mjs';
 import { runDelete } from '../../lib/delete.mjs';
 import { loadState, worklists } from '../../lib/state.mjs';
 import { runMd5fix } from '../../lib/md5fix.mjs';
-import { inject } from '../../lib/upload.mjs';
+import { runUpload } from '../../lib/upload.mjs';
 import { log, out } from '../../lib/log.mjs';
 
 export async function runCycle({ flags, pos }) {
@@ -21,11 +21,12 @@ export async function runCycle({ flags, pos }) {
   const w = worklists(loadState(cfg.system.project.ledgerPath));
   const names = id === 'jie6' ? [...w.deliv_reupload] : [...w.test_reupload, ...w.test_toupload];
   if (names.length) await runMd5fix(cfg, names, { log }); steps.push('md5fix');
-  // ⑤ upload —— 计划① 留桩
+  // ⑤ upload —— 计划② 已实现（★会真上传到平台；--skip-upload 仍可跳过）
   if (flags['skip-upload']) { log.warn('cycle ⑤ upload 跳过（--skip-upload）'); steps.push('upload:skipped'); }
   else {
-    try { await inject(/* cdp */ null, cfg, /* files */ []); steps.push('upload'); } // ★A9: 按 inject(cdp,cfg,files) 真实签名占位传参，计划②填实现时不致参数错位
-    catch (e) { if (e.code === 'E_NOT_IMPL') { log.warn('cycle ⑤ upload 未实现（计划②）→ 等价 --skip-upload'); steps.push('upload:not-impl'); } else throw e; }
+    const w2 = worklists(loadState(cfg.system.project.ledgerPath));
+    const upNames = id === 'jie6' ? [...w2.deliv_toupload, ...w2.deliv_reupload] : [...w2.test_toupload, ...w2.test_reupload];
+    const r = await runUpload(cfg, { names: upNames, log }); steps.push(`upload:inj${r.injected}/sub${r.submitted}`);
   }
   log.ok(`cycle ${id} 骨架跑完：${steps.join(' → ')}`);
   if (flags.json) out({ command: 'cycle', target: id, steps });
