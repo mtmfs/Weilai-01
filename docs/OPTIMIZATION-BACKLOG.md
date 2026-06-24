@@ -9,7 +9,8 @@
 - **C2 / C3 / C4 提速**：✅ 完成并 live 验证（`d2aec32`），sync `19s→10.9s`。
 - **S5 Thompson bandit**：✅ 模块完成、离线单测 7/7（`13ad129`）；**未接线**（消费方=hold-submit，Phase 3/4）。
 - **Phase 1（C1/C5/S8 ready 收敛提速）**：✅ **代码完成并 live 验证**（`4dad860`，2026-06-24 清盘后 jie3 真账户复测）。**冷启动 32.1s**（attempt1 一次过·账户✓·视图开，vs 基线≈39s）｜**热路径 0.9s**（S8 probeSnapshot 空转 skipped）｜**仅抽屉关 1.4s**（C5 `open-view-only`·不重握手）。冷启动未达 ~15s 目标——余下耗时＝Chrome 启动 8s + 冷握手/建标签/等账户 16s（基本不可压、非代码问题）；C1/C5/S8 真实收益在温/热/抽屉关路径：**操作者日常 re-ready 从 ~40s 塌到 ~1s**。同轮只读链路全过（`sync --no-mutate` live=315 / `delete --dry-run` 将删0 / 台账字节·mtime 未变 / `close` 优雅关）。
-- **S1 及之后**：⬜ 未开始。
+- **S1a（mid 增量同步）**：✅ **完成并 live 对账验证**（`--incremental` opt-in，默认仍全量）。13 在飞件与全量逐字段一致、查 0.3s vs 全量 3.4s、台账零改动。⚠️ 本轮 13 件 last_mid 均 isDel→observed0（轮次间已删），"读 live 审核变更"路径＝同一 observe()，待计划②产出新 live mid 实测。S1b（签名缓存跳 reload）⬜ 待做。
+- **S2 及之后**：⬜ 未开始。
 
 ## ✅ 头号阻塞已解（2026-06-24）
 
@@ -31,7 +32,7 @@
 
 | 编号 | 内容 | 改动量 | 架构 | 状态 / 前置 |
 |---|---|---|---|---|
-| **S1** ★ | mid 增量同步：按台账 `last_mid` 批量查 `list-optional`，O(在飞)；根治 norm 脆弱 + 30s 天花板 | 中 | 中 | ⬜ **下一个最该做**；有 standalone plan；可 live 对账验（14/17 在飞件已有 last_mid） |
+| **S1** ★ | mid 增量同步：按台账 `last_mid` 批量查 `list-optional`，O(在飞)；根治 norm 脆弱 + 30s 天花板 | 中 | 中 | 🟢 **S1a 完成·live 对账验证**（`pullRowsByMid`+`runSyncIncremental`+`--incremental`；13 在飞件与全量逐字段一致·0.3s vs 3.4s；本轮均 isDel→observed0，live-audit 路径待计划②）。S1b 签名缓存 ⬜ |
 | S2 | 连续流水线：常驻调度拉满 WIP，上传期/审核期重叠（Little 定律） | 大 | 重大 | ⬜ 需 S1+S3 |
 | S3 | 事件驱动提交 + 逐文件超时（监听 Network 完成信号，替代 12s 刮 DOM%）；填 upload/submit 桩 | 中 | 局部-中 | ⬜ 计划②；碰真上传 |
 | S4 | 双通道并行 cycle（`both`，两独立实例 `Promise.allSettled`） | 小-中 | 局部 | ⬜ 受阻于 jie6 冷 profile 登录 |
@@ -46,7 +47,7 @@
 ## 阶段路线图（按依赖/风险）
 
 1. **Phase 1 = C1+C5+S8**（ready 收敛提速）→ ✅ **已 live 验证**（2026-06-24 清盘后 jie3 真账户，`backup/verify-phase1.mjs` 分段计时：冷启 32.1s / 热 0.9s / 抽屉关 1.4s）。冷启动短于 15s 目标的部分＝Chrome 启动+冷握手不可压；温/热路径已塌到 ~1s。**Phase 1 收官，下一步＝ Phase 2（S1 mid 增量同步）**。
-2. **Phase 2 = S1**（mid 增量同步）→ 独立、可 live 对账验，性价比最高。
+2. **Phase 2 = S1**（mid 增量同步）→ 🟢 **S1a 落地**（opt-in `--incremental`，对账与全量一致、查询快 11×）。剩 S1b（签名缓存跳 reload，需先 `probe-sig-ttl` 实测 list-optional 签名 TTL）。
 3. **Phase 3 = S3 → S2**（上传核心=计划②）+ 建 `submissions.jsonl` pass-rate 基建。碰真上传，先 jie3 后 jie6。
 4. **Phase 4 = S5 接线 + S7 + S6**（数据驱动，依赖 Phase 3 产出 pass-rate）。
 5. **Phase 5 = S4 + S9**（受阻/长期）。
