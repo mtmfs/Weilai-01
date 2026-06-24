@@ -10,7 +10,7 @@
 - **S5 Thompson bandit**：✅ 模块完成、离线单测 7/7（`13ad129`）；**未接线**（消费方=hold-submit，Phase 3/4）。
 - **Phase 1（C1/C5/S8 ready 收敛提速）**：✅ **代码完成并 live 验证**（`4dad860`，2026-06-24 清盘后 jie3 真账户复测）。**冷启动 32.1s**（attempt1 一次过·账户✓·视图开，vs 基线≈39s）｜**热路径 0.9s**（S8 probeSnapshot 空转 skipped）｜**仅抽屉关 1.4s**（C5 `open-view-only`·不重握手）。冷启动未达 ~15s 目标——余下耗时＝Chrome 启动 8s + 冷握手/建标签/等账户 16s（基本不可压、非代码问题）；C1/C5/S8 真实收益在温/热/抽屉关路径：**操作者日常 re-ready 从 ~40s 塌到 ~1s**。同轮只读链路全过（`sync --no-mutate` live=315 / `delete --dry-run` 将删0 / 台账字节·mtime 未变 / `close` 优雅关）。
 - **S1（mid 增量同步）**：✅ **完成并 live 验证**。**S1a**（`--incremental` opt-in，默认仍全量）：13 在飞件与全量逐字段一致、查 0.3s vs 全量 3.4s、台账零改动。**S1b**（签名缓存跳 reload）：探针实测 op 签名 TTL≥10min（age 0/2/5/10min 全有效）→ budget 7min；cache 命中 **6s→1s**（跳 reload），失效自动回退现抓（健康判据＝响应须含 `data.materialInfoMap` 形状，SPA/登录页/错误码都会触发回退）。⚠️ 本轮 13 件 last_mid 均 isDel→observed0（轮次间已删），"读 live 审核变更"路径＝同一 observe()，待计划②产出新 live mid 实测。
-- **Phase 3 / S3（上传核心·计划②）**：🟢 **核心 live 验证**。`upload.mjs`(瞬态注入 openUploadPanel/inject + 编排 runUpload) + `submit.mjs`(逐文件超时改造整批门控 + N 取确认弹窗) + bump 接线 + `upload` 命令 + cycle 集成。真 jie3 上传 1 件 md5fix'd 文件 → **素材创建成功**（id=…946534 audit=3 审核中）；bump uploads++ dry 验证（4→5·last_status=3·stage 正确）。⚠️ v1 限制：①未加轮次 token 幂等（upload 重跑会双计 uploads，轮间须先 sync）②test-round/deliver-round 仍骨架（cycle 已含完整上传链）③hold-submit 留桩（需延迟挂起 TTL 探针）④Network 事件驱动完成信号＝后续精化（现用 DOM %-stall 逐文件超时）⑤副产物：测试素材 测试_12 留在平台待审、可后续 delete。
+- **Phase 3 / S3（上传核心·计划②）**：🟢 **核心 live 验证 + 硬化**。`upload.mjs`(瞬态注入 + 编排 runUpload) + `submit.mjs`(逐文件超时 + N 取确认弹窗) + bump + `upload`/`test-round`/`deliver-round` 命令 + cycle 集成。真 jie3 上传 md5fix'd 文件 → **素材创建成功**（id=…946534 audit=3）；bump dry 验证（uploads 4→5·last_status=3·stage 正确）。**硬化**：①**轮次 token 幂等**（同批文件 30min 内重跑→跳过整轮，防重复素材+双计 uploads；逻辑 dry-test 5/5✓）②**openView 冷启动重试**（live 验证：冷启"视图未现→重试2/3"自愈，根治本会话两次 E_SELECTOR；openView waitFor 4s→6s）③test-round/deliver-round 接线。⚠️ 剩：hold-submit 留桩（需 TTL 探针）；Network 事件驱动完成信号=后续精化（现 DOM %-stall）；deliver-round/jie6 未 live（冷 profile 登录未通）；测试素材 测试_12 留平台待审、可后续 delete。
 - **S2 及之后**：⬜ 未开始。
 
 ## ✅ 头号阻塞已解（2026-06-24）
@@ -49,7 +49,7 @@
 
 1. **Phase 1 = C1+C5+S8**（ready 收敛提速）→ ✅ **已 live 验证**（2026-06-24 清盘后 jie3 真账户，`backup/verify-phase1.mjs` 分段计时：冷启 32.1s / 热 0.9s / 抽屉关 1.4s）。冷启动短于 15s 目标的部分＝Chrome 启动+冷握手不可压；温/热路径已塌到 ~1s。**Phase 1 收官，下一步＝ Phase 2（S1 mid 增量同步）**。
 2. **Phase 2 = S1**（mid 增量同步）→ ✅ **完成**（S1a 增量+对账一致·查询快 11×；S1b 签名缓存：实测 op 签名 TTL≥10min→budget 7min·cache 命中 6s→1s·失效回退自愈）。**Phase 2 收官，下一步＝ Phase 3（计划②上传核心，S1 的 live-audit 路径在此被实测）**。
-3. **Phase 3 = S3 → S2**（上传核心=计划②）→ 🟢 **S3 核心落地·live 验证**（真 jie3 创建素材；inject+submit+bump+upload命令+cycle）。剩：轮次 token 幂等 / test-round·deliver-round / `submissions.jsonl` pass-rate 基建 / S2 连续流水线。先 jie3 后 jie6。
+3. **Phase 3 = S3 → S2**（上传核心=计划②）→ 🟢 **S3 核心落地·live 验证 + 硬化**（真 jie3 创建素材；inject+submit+bump+轮次token幂等+openView重试+test-round/deliver-round+cycle）。剩：`submissions.jsonl` pass-rate 基建 / S2 连续流水线 / hold-submit(TTL 探针) / deliver-round live(待 jie6 登录)。先 jie3 后 jie6。
 4. **Phase 4 = S5 接线 + S7 + S6**（数据驱动，依赖 Phase 3 产出 pass-rate）。
 5. **Phase 5 = S4 + S9**（受阻/长期）。
 

@@ -9,6 +9,7 @@ import { runDeleteCmd } from './cmds/delete.mjs';
 import { runMd5fixCmd } from './cmds/md5fix.mjs';
 import { runPrep } from './cmds/prep.mjs';
 import { runUploadCmd } from './cmds/upload.mjs';
+import { runTestRound, runDeliverRound } from './cmds/rounds.mjs';
 import { runCycle } from './cmds/cycle.mjs';
 import { runMonitor } from './cmds/monitor.mjs';
 import { runStatsCmd } from './cmds/stats.mjs';
@@ -27,8 +28,8 @@ const COMMANDS = {
   prep: { phase: 3, run: runPrep, help: 'sync → delete(先dry后apply) → md5fix' },
   upload: { phase: 3, run: runUploadCmd, help: 'inject → submit(逐文件超时) → bump（★会真上传到平台）' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
-  'test-round': { phase: 3, help: 'jie3 一轮：prep + upload' },
-  'deliver-round': { phase: 4, help: 'jie6 一轮：ready + 取 sealed + upload' },
+  'test-round': { phase: 3, run: runTestRound, help: 'jie3 一轮：ready→sync→delete→md5fix→upload（★含真上传）' },
+  'deliver-round': { phase: 4, run: runDeliverRound, help: 'jie6 一轮：ready→sync→md5fix→upload（⚠️jie6 未 live 验证）' },
   sweep: { phase: 3, help: 'jie6：sync → delete' },
   monitor: { phase: 4, run: runMonitor, help: '起旁路遥测录制（常驻·跨所有标签被动·不干扰操作）' },
   stats: { phase: 4, run: runStatsCmd, help: '读录制 JSONL 出分时段请求/端点/时长报表' },
