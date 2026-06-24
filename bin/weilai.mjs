@@ -34,16 +34,26 @@ const COMMANDS = {
   cycle: { phase: 4, run: runCycle, help: '全局编排骨架: ready→sync→delete→md5fix→[upload]; --skip-upload 跳过上传' },
 };
 
+// ★A2: 取值 flag。这些 flag 需要带值（`--seconds 600` 或 `--seconds=600`）；其余 `--xxx` 仍是布尔。
+const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel']);
 function parseArgs(argv) {
   const flags = { json: false, dryRun: false, apply: false, help: false };
   const pos = [];
-  for (const a of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
     if (a === '--json') flags.json = true;
     else if (a === '--dry-run') flags.dryRun = true;
     else if (a === '--apply') flags.apply = true;
     else if (a === '-h' || a === '--help') flags.help = true;
-    else if (a.startsWith('--')) flags[a.slice(2)] = true;
-    else pos.push(a);
+    else if (a.startsWith('--')) {
+      const eq = a.indexOf('=');
+      if (eq !== -1) flags[a.slice(2, eq)] = a.slice(eq + 1);                 // --flag=value
+      else {
+        const name = a.slice(2);
+        if (VALUE_FLAGS.has(name) && i + 1 < argv.length && !argv[i + 1].startsWith('--')) flags[name] = argv[++i]; // --flag value
+        else flags[name] = true;                                             // 布尔 flag
+      }
+    } else pos.push(a);
   }
   return { flags, pos };
 }

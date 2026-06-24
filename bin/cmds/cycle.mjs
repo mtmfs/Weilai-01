@@ -24,7 +24,7 @@ export async function runCycle({ flags, pos }) {
   // ⑤ upload —— 计划① 留桩
   if (flags['skip-upload']) { log.warn('cycle ⑤ upload 跳过（--skip-upload）'); steps.push('upload:skipped'); }
   else {
-    try { await inject(cfg); steps.push('upload'); }
+    try { await inject(/* cdp */ null, cfg, /* files */ []); steps.push('upload'); } // ★A9: 按 inject(cdp,cfg,files) 真实签名占位传参，计划②填实现时不致参数错位
     catch (e) { if (e.code === 'E_NOT_IMPL') { log.warn('cycle ⑤ upload 未实现（计划②）→ 等价 --skip-upload'); steps.push('upload:not-impl'); } else throw e; }
   }
   log.ok(`cycle ${id} 骨架跑完：${steps.join(' → ')}`);
