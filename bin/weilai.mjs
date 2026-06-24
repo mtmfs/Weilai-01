@@ -13,6 +13,7 @@ import { runTestRound, runDeliverRound } from './cmds/rounds.mjs';
 import { runCycle } from './cmds/cycle.mjs';
 import { runMonitor } from './cmds/monitor.mjs';
 import { runStatsCmd } from './cmds/stats.mjs';
+import { runPassrate } from './cmds/passrate.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
@@ -33,6 +34,7 @@ const COMMANDS = {
   sweep: { phase: 3, help: 'jie6：sync → delete' },
   monitor: { phase: 4, run: runMonitor, help: '起旁路遥测录制（常驻·跨所有标签被动·不干扰操作）' },
   stats: { phase: 4, run: runStatsCmd, help: '读录制 JSONL 出分时段请求/端点/时长报表' },
+  passrate: { phase: 4, run: runPassrate, help: '读 submissions.jsonl 出分时段过审率 + Thompson(S5) 建议提交时段' },
   cycle: { phase: 4, run: runCycle, help: '全局编排骨架: ready→sync→delete→md5fix→[upload]; --skip-upload 跳过上传' },
 };
 

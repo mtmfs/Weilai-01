@@ -7,7 +7,7 @@
 
 - **A 系列 10 个 bug**：✅ 全修，离线 12 单测 + live 全链验证（`85d09a1`，部分随 perf 提交）。
 - **C2 / C3 / C4 提速**：✅ 完成并 live 验证（`d2aec32`），sync `19s→10.9s`。
-- **S5 Thompson bandit**：✅ 模块完成、离线单测 7/7（`13ad129`）；**未接线**（消费方=hold-submit，Phase 3/4）。
+- **S5 Thompson bandit + pass-rate 基建**：✅ 模块 + **接线**。`submissions.jsonl`（submit-time materialId→audit 结果）：upload 记提交（★point7 max-mid 捕获，同填 bump.last_mid→解锁 S1 live-audit）、sync 顺带结审（复用已拉 platform·零额外调用）、`passrate` 命令出分时段过审率/时延 + Thompson 建议提交时段（passRateArms 喂臂）。离线全管线 11/11✓。hold-submit 消费待其转正。
 - **Phase 1（C1/C5/S8 ready 收敛提速）**：✅ **代码完成并 live 验证**（`4dad860`，2026-06-24 清盘后 jie3 真账户复测）。**冷启动 32.1s**（attempt1 一次过·账户✓·视图开，vs 基线≈39s）｜**热路径 0.9s**（S8 probeSnapshot 空转 skipped）｜**仅抽屉关 1.4s**（C5 `open-view-only`·不重握手）。冷启动未达 ~15s 目标——余下耗时＝Chrome 启动 8s + 冷握手/建标签/等账户 16s（基本不可压、非代码问题）；C1/C5/S8 真实收益在温/热/抽屉关路径：**操作者日常 re-ready 从 ~40s 塌到 ~1s**。同轮只读链路全过（`sync --no-mutate` live=315 / `delete --dry-run` 将删0 / 台账字节·mtime 未变 / `close` 优雅关）。
 - **S1（mid 增量同步）**：✅ **完成并 live 验证**。**S1a**（`--incremental` opt-in，默认仍全量）：13 在飞件与全量逐字段一致、查 0.3s vs 全量 3.4s、台账零改动。**S1b**（签名缓存跳 reload）：探针实测 op 签名 TTL≥10min（age 0/2/5/10min 全有效）→ budget 7min；cache 命中 **6s→1s**（跳 reload），失效自动回退现抓（健康判据＝响应须含 `data.materialInfoMap` 形状，SPA/登录页/错误码都会触发回退）。⚠️ 本轮 13 件 last_mid 均 isDel→observed0（轮次间已删），"读 live 审核变更"路径＝同一 observe()，待计划②产出新 live mid 实测。
 - **Phase 3 / S3（上传核心·计划②）**：🟢 **核心 live 验证 + 硬化**。`upload.mjs`(瞬态注入 + 编排 runUpload) + `submit.mjs`(逐文件超时 + N 取确认弹窗) + bump + `upload`/`test-round`/`deliver-round` 命令 + cycle 集成。真 jie3 上传 md5fix'd 文件 → **素材创建成功**（id=…946534 audit=3）；bump dry 验证（uploads 4→5·last_status=3·stage 正确）。**硬化**：①**轮次 token 幂等**（同批文件 30min 内重跑→跳过整轮，防重复素材+双计 uploads；逻辑 dry-test 5/5✓）②**openView 冷启动重试**（live 验证：冷启"视图未现→重试2/3"自愈，根治本会话两次 E_SELECTOR；openView waitFor 4s→6s）③test-round/deliver-round 接线。⚠️ 剩：hold-submit 留桩（需 TTL 探针）；Network 事件驱动完成信号=后续精化（现 DOM %-stall）；deliver-round/jie6 未 live（冷 profile 登录未通）；测试素材 测试_12 留平台待审、可后续 delete。
@@ -37,7 +37,7 @@
 | S2 | 连续流水线：常驻调度拉满 WIP，上传期/审核期重叠（Little 定律） | 大 | 重大 | ⬜ 需 S1+S3 |
 | S3 | 逐文件超时提交 + 填 upload/submit 桩（替整批门控） | 中 | 局部-中 | 🟢 **核心 live 验证**（移植瞬态注入 + 逐文件超时改造 + N 取弹窗；真 jie3 创建素材✓·bump dry✓）。轮次token幂等/Network 事件驱动＝后续 |
 | S4 | 双通道并行 cycle（`both`，两独立实例 `Promise.allSettled`） | 小-中 | 局部 | ⬜ 受阻于 jie6 冷 profile 登录 |
-| **S5** | Thompson 采样择时（Beta-Bernoulli，24 时段臂） | 小 | 局部 | ✅ **模块完成**（`lib/bandit.mjs`，离线验）；待接 hold-submit |
+| **S5** | Thompson 采样择时（Beta-Bernoulli，24 时段臂）+ pass-rate 基建 | 小 | 局部 | ✅ **完成+接线**（submissions.jsonl 旁车·upload 记/sync 结审/`passrate` 命令·passRateArms 喂臂；离线 11/11）。hold-submit 消费待转正 |
 | S6 | 上传前 ffprobe 预校验筛必拒件 | 小-中 | 局部 | ⬜ 需平台必拒阈值（领域数据） |
 | S7 | 重试预算 maxUploads 固定 → 按 pass_rate 优化广度/深度 | 小 | 局部 | ⬜ 需 pass_rate 数据 |
 | S8 | 探针合并 `probeSnapshot`（一次往返拿 acc/url/view/plan） | 小 | 无-局部 | ✅ **live 验证**（热路径 0.9s 空转 skipped） |
@@ -49,8 +49,8 @@
 
 1. **Phase 1 = C1+C5+S8**（ready 收敛提速）→ ✅ **已 live 验证**（2026-06-24 清盘后 jie3 真账户，`backup/verify-phase1.mjs` 分段计时：冷启 32.1s / 热 0.9s / 抽屉关 1.4s）。冷启动短于 15s 目标的部分＝Chrome 启动+冷握手不可压；温/热路径已塌到 ~1s。**Phase 1 收官，下一步＝ Phase 2（S1 mid 增量同步）**。
 2. **Phase 2 = S1**（mid 增量同步）→ ✅ **完成**（S1a 增量+对账一致·查询快 11×；S1b 签名缓存：实测 op 签名 TTL≥10min→budget 7min·cache 命中 6s→1s·失效回退自愈）。**Phase 2 收官，下一步＝ Phase 3（计划②上传核心，S1 的 live-audit 路径在此被实测）**。
-3. **Phase 3 = S3 → S2**（上传核心=计划②）→ 🟢 **S3 核心落地·live 验证 + 硬化**（真 jie3 创建素材；inject+submit+bump+轮次token幂等+openView重试+test-round/deliver-round+cycle）。剩：`submissions.jsonl` pass-rate 基建 / S2 连续流水线 / hold-submit(TTL 探针) / deliver-round live(待 jie6 登录)。先 jie3 后 jie6。
-4. **Phase 4 = S5 接线 + S7 + S6**（数据驱动，依赖 Phase 3 产出 pass-rate）。
+3. **Phase 3 = S3 → S2**（上传核心=计划②）→ 🟢 **S3 核心落地·live 验证 + 硬化 + point7 mid 捕获**（真 jie3 创建素材；inject+submit+bump+轮次token幂等+openView重试+test-round/deliver-round+cycle）。剩：S2 连续流水线 / hold-submit(TTL 探针) / deliver-round live(待 jie6 登录)。**pass-rate 基建已建**（见 S5）。先 jie3 后 jie6。
+4. **Phase 4 = S5 接线 + S7 + S6**（数据驱动）→ 🟢 **S5 接线 + pass-rate 基建落地**（submissions.jsonl + `passrate` + bandit arms；离线 11/11 验）。剩：S7 重试预算 / S6 ffprobe 预校验（均需积累真实 pass-rate 数据）+ hold-submit 接 bandit 择时。
 5. **Phase 5 = S4 + S9**（受阻/长期）。
 
 依赖：`Phase1`、`S1`、`S3` 各自独立；`S2` 需 S1+S3；`S5/S6/S7` 需 Phase3 的 pass-rate；`S4` 需 jie6 登录修复。
