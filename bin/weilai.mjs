@@ -8,6 +8,7 @@ import { runSyncCmd } from './cmds/sync.mjs';
 import { runDeleteCmd } from './cmds/delete.mjs';
 import { runMd5fixCmd } from './cmds/md5fix.mjs';
 import { runPrep } from './cmds/prep.mjs';
+import { runReconcileCmd } from './cmds/reconcile.mjs';
 import { runUploadCmd } from './cmds/upload.mjs';
 import { runTestRound, runDeliverRound } from './cmds/rounds.mjs';
 import { runCycle } from './cmds/cycle.mjs';
@@ -27,6 +28,7 @@ const COMMANDS = {
   delete: { phase: 3, run: runDeleteCmd, help: '删过审+被拒副本（★默认 dry-run，--apply 才真删）' },
   md5fix: { phase: 3, run: runMd5fixCmd, help: '对待传/重传清单改 MD5（并行，纯本地）' },
   prep: { phase: 3, run: runPrep, help: 'sync → delete(先dry后apply) → md5fix' },
+  reconcile: { phase: 3, run: runReconcileCmd, help: '对账 Bug B：un-bump 幻影上传（注入了但未真创建素材，uploads 虚高）·★默认 dry-run，--apply 才写台账（--grace-min N）' },
   upload: { phase: 3, run: runUploadCmd, help: 'inject → submit(逐文件超时) → bump（★会真上传到平台）' },
   'hold-submit': { phase: 4, help: '延迟挂起后择时一口气提交（TTL 实测转正后）' },
   'test-round': { phase: 3, run: runTestRound, help: 'jie3 一轮：ready→sync→delete→md5fix→upload（★含真上传）' },
@@ -39,7 +41,7 @@ const COMMANDS = {
 };
 
 // ★A2: 取值 flag。这些 flag 需要带值（`--seconds 600` 或 `--seconds=600`）；其余 `--xxx` 仍是布尔。
-const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel', 'rounds', 'round-wait']);
+const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min']);
 function parseArgs(argv) {
   const flags = { json: false, dryRun: false, apply: false, help: false };
   const pos = [];
