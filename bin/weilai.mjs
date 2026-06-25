@@ -35,11 +35,11 @@ const COMMANDS = {
   monitor: { phase: 4, run: runMonitor, help: '起旁路遥测录制（常驻·跨所有标签被动·不干扰操作）' },
   stats: { phase: 4, run: runStatsCmd, help: '读录制 JSONL 出分时段请求/端点/时长报表' },
   passrate: { phase: 4, run: runPassrate, help: '读 submissions.jsonl 出分时段过审率 + Thompson(S5) 建议提交时段' },
-  cycle: { phase: 4, run: runCycle, help: '全局编排骨架: ready→sync→delete→md5fix→[upload]; --skip-upload 跳过上传' },
+  cycle: { phase: 4, run: runCycle, help: '多轮收敛: ready→{sync→delete(每轮腾槽)→md5fix→[upload]}×N; --rounds N --round-wait MIN --skip-upload' },
 };
 
 // ★A2: 取值 flag。这些 flag 需要带值（`--seconds 600` 或 `--seconds=600`）；其余 `--xxx` 仍是布尔。
-const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel']);
+const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel', 'rounds', 'round-wait']);
 function parseArgs(argv) {
   const flags = { json: false, dryRun: false, apply: false, help: false };
   const pos = [];
