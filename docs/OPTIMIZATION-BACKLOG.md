@@ -87,8 +87,18 @@
 
 **修复进度（2026-06-25）**：
 - 🟡 **①② 已修 + 离线验证**（`lib/upload.mjs` runUpload 注入0→抛 `E_GESTURE`；`lib/submit.mjs` 空面板 total=0→1ms 短路返回，实测）。**失败模式已根治**：从"静默 45min 空转、退出码0"变成"秒级 `E_GESTURE`/退出15、编排器可接住"。注：这修的是**失败模式**（静默→大声），不是**根因**（冷启竞速仍可能发生，但现在大声失败可恢复，且让 iterate 驱动的 try/catch 真正生效）。
-- ⬜ **③④ 根因预防（warm-up）未做**：openUploadPanel 可交互探测 / ready 预热上传组件。做完冷启动也不犯。本会话靠"暖 Chrome 不 close"运营绕过未触发。
-- ✅ ①②③④ 相关改动均已提交（branch `fix-uncommitted-batch`）。
+- ⬜ ~~③④ 根因预防（warm-up）~~ **作废——根因不是"冷加载"，见下方真根因**。
+- ✅ ①② 相关改动均已提交（branch `fix-uncommitted-batch`）。
+
+### ★★ NO_CHOOSER 真根因（2026-06-25 instrument 三层确诊·已根治）
+
+之前"上传框可见先于可交互/组件冷加载/C: 紧"的诊断**全错**（是推断、没 instrument）。用 `elementFromPoint`/逐时坐标/截图/`Page.captureScreenshot` 钉死真因：
+
+- **三层链**：① clickAt(`Input.dispatchMouseEvent`) 点到屏外坐标 → ② `findBox` 的 `getBoundingClientRect` 返回屏外值（实测 cx=2454 > innerWidth=1904；jie6 抽屉宽 ~1100 比窄窗口还宽）→ ③ **真根因＝页面在后台时抽屉布局不落定，box 卡在关闭位(屏外右侧)**。
+- **解药＝`Emulation.setFocusEmulationEnabled(true)`**：让后台页按"聚焦"渲染→抽屉布局立刻落定→box 回 1354 屏内。**实测：仅 `Page.bringToFront` 不够（box 仍 2454）；加 setFocusEmulation 后 box→1354 屏内、clickAt 即弹 chooser**（冷启 jie6 终验通过 ✅）。
+- **修法（三重·已提交+验证）**：`lib/upload.mjs::findBox` ① 先 `setFocusEmulationEnabled(true)`（真解药）+ 每轮 `bringToFront` ② 连续两次坐标稳定(±2px)且 `inView` 才返回、屏外宁可 null 让上层重试（防御） ③ `system.json --window-size=1920,1080` 钉死宽窗口（防御，抽屉落定后能容下）。
+- **为何 jie3 多数没事 / 偶发(upload2)中招**：jie3 抽屉窄、且操作时多在前台；jie6 创意tab 抽屉宽、易在后台测坐标→中招。C: 仅间接（慢渲染拉长未落定窗口），非根因。
+- **致谢**：是操作者一句"我手动点就正常弹、会不会是 click 的问题"把方向从"组件"扳到"坐标/手势"，才挖到真根因。
 
 ---
 

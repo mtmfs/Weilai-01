@@ -13,7 +13,9 @@
       "--no-first-run",
       "--no-default-browser-check",
       "--disable-session-crashed-bubble",
-      "--hide-crash-restore-bubble"
+      "--hide-crash-restore-bubble",
+      "--window-size=1920,1080",
+      "--window-position=0,0"
     ]
   },
   "ffmpeg": {
