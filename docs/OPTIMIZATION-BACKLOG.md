@@ -88,4 +88,20 @@
 **修复进度（2026-06-25）**：
 - 🟡 **①② 已修 + 离线验证**（`lib/upload.mjs` runUpload 注入0→抛 `E_GESTURE`；`lib/submit.mjs` 空面板 total=0→1ms 短路返回，实测）。**失败模式已根治**：从"静默 45min 空转、退出码0"变成"秒级 `E_GESTURE`/退出15、编排器可接住"。注：这修的是**失败模式**（静默→大声），不是**根因**（冷启竞速仍可能发生，但现在大声失败可恢复，且让 iterate 驱动的 try/catch 真正生效）。
 - ⬜ **③④ 根因预防（warm-up）未做**：openUploadPanel 可交互探测 / ready 预热上传组件。做完冷启动也不犯。本会话靠"暖 Chrome 不 close"运营绕过未触发。
-- ⚠️ 改动**未提交**（与 C档/cycle多轮/kw字段锁 一起在工作区）。
+- ✅ ①②③④ 相关改动均已提交（branch `fix-uncommitted-batch`）。
+
+---
+
+## ★ 生产级 34 大批量上传暴露的 2 个 submit/bump bug（2026-06-25 真跑）
+
+首次 jie3「34 件一次性真上传」（≤18 小批从没触发）暴露两个真问题。结果：注入 34 / 平台确认 28 / 6 卡 0%。
+
+**Bug A — submit 逐文件超时形同虚设（拖满 45min）✅ 已修**
+完成的文件进度条会**移出列表** → `snap().done` 永久≈0 → 旧踢回判据 `if (s.done>0)` 永不触发 → 6 个卡 0% 件把整批拖到 `maxMs`(45min) 硬超时才提交，而非 `perFileNoProgressSec`(90s) 踢回。
+- **修法**（`lib/submit.mjs`）：改用 `s.cEn`（底部确定可点=已有完成件可提交）当"有完成件"信号；进度判据=`inprogSum` 或 `total` 任一变化（total 减少=有件完成离场也算进度）。龟速件 90s 无进度 → 提交已完成、踢回未完成。
+
+**Bug B — bump 按"注入"而非"提交"记账（台账虚高）⬜ 待修·有恢复手段**
+`runUpload` 给所有**注入**的 34 件 `uploads++`，但只有 28 个真提交 → 6 卡死件被多记 1 次（含 1 个 uploads=4→5 被冤到作废边缘）。
+- **为何难根治**：submit 只知**数量**（28）不知**身份**；上传瞬间平台素材名还是 ID（未解析回文件名），inline 关联不可靠。bump-only-captured 会**漏记真提交**（更糟：漏记→重传→平台重复件）。故**保留 bump-all-injected**（过记方向可恢复），靠**事后对账**纠偏。
+- **恢复手段（已验证有效）**：本轮 34 件共享同一 `last_ts`（runUpload 同一 `now`）。sync 后凡 `last_ts` 未被更新者=没传上平台的卡死件 → un-bump（`uploads-1`、`last_status`→2/null、清 `last_mid`/`last_ts`）。本轮据此精准恢复 6 件、0 误伤。
+- **待办**：把这套对账做成 `weilai reconcile <ch>`（grace 期后按 last_ts 签名 + 平台素材缺失判定 un-bump），让台账自愈，免手工脚本。
