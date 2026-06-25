@@ -15,7 +15,8 @@ export async function runTestRound({ flags, pos }) {
   const cfg = loadConfig(id);
   log.step('test-round ① ready'); await ready(cfg, { secrets: loadSecrets(), log });
   log.step('test-round ② sync'); const s = await runSync(cfg, { log });
-  log.step(`test-round ③ delete（${flags.apply ? 'apply' : 'dry-run'}）`); await runDelete(cfg, { apply: !!flags.apply, log });
+  // ★穿 sync 刚拉的 platform 快照给 delete → 免其重复拉取（同账户 sync 已 guardEnter 过）。
+  log.step(`test-round ③ delete（${flags.apply ? 'apply' : 'dry-run'}）`); await runDelete(cfg, { apply: !!flags.apply, log, platform: s.platform });
   const names = (() => { const w = worklists(loadState(cfg.system.project.ledgerPath)); return [...w.test_reupload, ...w.test_toupload]; })();
   log.step(`test-round ④ md5fix（${names.length} 件）`); if (names.length) await runMd5fix(cfg, names, { log });
   log.step('test-round ⑤ upload');

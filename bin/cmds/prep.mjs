@@ -11,7 +11,8 @@ export async function runPrep({ flags, pos }) {
   if (id !== 'jie3' && id !== 'jie6') { const e = new Error('用法: weilai prep <jie3|jie6> [--apply]'); e.code = 'E_USAGE'; throw e; }
   const cfg = loadConfig(id);
   log.step('prep ①/3 sync'); const s = await runSync(cfg, { log });
-  log.step(`prep ②/3 delete（${flags.apply ? 'apply' : 'dry-run'}）`); const d = await runDelete(cfg, { apply: !!flags.apply, log });
+  // ★穿 sync 刚拉的 platform 快照给 delete → 免其重复拉取（dry-run 时连 CDP 都不连）。
+  log.step(`prep ②/3 delete（${flags.apply ? 'apply' : 'dry-run'}）`); const d = await runDelete(cfg, { apply: !!flags.apply, log, platform: s.platform });
   log.step('prep ③/3 md5fix');
   const w = worklists(loadState(cfg.system.project.ledgerPath));
   const names = id === 'jie6' ? [...w.deliv_reupload] : [...w.test_reupload, ...w.test_toupload];
