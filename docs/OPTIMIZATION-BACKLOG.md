@@ -64,3 +64,28 @@
 ## 已结案的疑点
 
 - **bug #1「delete 将删 0」= 正确行为**（已用平台数据交叉核实：13 待重传 + 4 sealed 在平台无 live 副本，无可删）。
+
+---
+
+## ★ 上传冷启首开竞速 + 静默空转 bug（2026-06-25 真跑揪出·⬜待修）
+
+**现象**：冷启动 Chrome 后**首次**上传，inject 第 1 批 `NO_CHOOSER` ×6 → 注入 0 个 → submit 拿空面板**空转到 45min 超时** → 返回 `injected:0/submitted:0`、**不抛错、退出码 0**。
+
+**根因 = 上传框"可见"先于"可交互"**：千川上传框是点击时临时建 `<input type=file>` 的 React 组件。冷启首开时框已渲染（`findBox` 命中、日志报"点击上传框可见"），但点击处理器**还没挂载完** → `clickAt` 点空 → 不建瞬态 input → 不弹 `Page.fileChooserOpened` → `NO_CHOOSER`。**满盘 C:（1.2G）** 挤压磁盘缓存 → 组件 JS 冷加载慢 → 处理器绑定窗口 **> inject 的 6×~24s 重试预算** → 输掉竞速。组件 JS 进 profile 磁盘缓存后（被打开过一次）秒绑、恢复正常。铁证：预热后同坐标 `clickAt` 一点即触发 chooser（chooser=1）。
+
+**与代码改动无关**：纯平台前端冷加载时序；inject/openUploadPanel 逻辑本身没问题（06-24 暖态单件上传验证过）。delete 平台快照改动等也无关。
+
+**★ 无人值守的真正危害 = 静默空转**：`NO_CHOOSER` 是 warn 不是 error；inject 返回空后 runUpload **照调 submit**、submit 对空面板**傻等 45min**、injected=0 不 bump、台账零变化、**退出码 0**。纯自动化 7 轮通宵跑 → "跑一夜、0 上传、无报错、无告警"——最坏的失败：看着像跑完、其实啥也没干、没人喊救命。
+
+**修复（按重要性）**：
+1. **大声失败（无人值守命门）**：inject 产 0 → runUpload 抛 `E_GESTURE`，别返回 `{injected:0}` 往下走；submit 开头**判空短路**（面板没东西就立刻返回，绝不进 45min 等）。把"静默 45min 空转"变"秒级 `E_GESTURE` 退出码"，让 cycle 能接住（重跑 ready/告警/停）。
+2. **判"可交互"非"可见"**：`openUploadPanel` 加预热探测——test-click 确认 `fileChooserOpened` 能触发才算 ready；不能就等+重开（带上限）。
+3. **冷启重试重开面板**（重挂组件）而非死点同一框 + 首批延长预算。
+4. **ready 阶段预热**：ready 顺手开一次上传面板把组件 JS 灌进缓存，真上传首开即热（最干净、不留挂起 chooser）。
+
+最佳组合 = **1（安全网）+ 4（预防）**。
+
+**修复进度（2026-06-25）**：
+- 🟡 **①② 已修 + 离线验证**（`lib/upload.mjs` runUpload 注入0→抛 `E_GESTURE`；`lib/submit.mjs` 空面板 total=0→1ms 短路返回，实测）。**失败模式已根治**：从"静默 45min 空转、退出码0"变成"秒级 `E_GESTURE`/退出15、编排器可接住"。注：这修的是**失败模式**（静默→大声），不是**根因**（冷启竞速仍可能发生，但现在大声失败可恢复，且让 iterate 驱动的 try/catch 真正生效）。
+- ⬜ **③④ 根因预防（warm-up）未做**：openUploadPanel 可交互探测 / ready 预热上传组件。做完冷启动也不犯。本会话靠"暖 Chrome 不 close"运营绕过未触发。
+- ⚠️ 改动**未提交**（与 C档/cycle多轮/kw字段锁 一起在工作区）。

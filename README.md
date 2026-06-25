@@ -1,6 +1,6 @@
 # Weilai-01
 
-> ⚠️ **接手 / 下个 agent：先读 [`docs/HANDOFF.md`](docs/HANDOFF.md)** —— 当前进度、磁盘满导致的"假崩"、下一步。
+> ⚠️ **接手 / 下个 agent：先读 [`docs/工作全景报告-2026-06-25.md`](docs/工作全景报告-2026-06-25.md)** —— 最新现状 / 落盘对账 / 已知坑；[`docs/HANDOFF.md`](docs/HANDOFF.md) 为早期交接快照。
 
 千川双通道过审流水线 CLI。把 `I:\cdp-helper\` 的 138 个散脚本收敛成一个**配置驱动、可被非程序员安全驱动、可被维护者低成本演进**的 CLI。
 
@@ -9,7 +9,7 @@
 - **机器真源** = 本地双通道台账 `_video_state.json`。
 
 ## 当前状态
-**Phase 0（骨架）**。`status` 命令可用（只读，读真实台账出汇总）；其余命令为占位，按 `docs/PLAN.md` 的 Phase 1–4 推进。
+**计划①②均落地、双通道闭环已 live 跑通**（jie3 筛过审 → jie6 真投放）。命令全部实现、多数已 live 验证：`status/ready/sync/delete/md5fix/prep/upload/test-round/deliver-round/cycle/monitor/stats/passrate/close`。upload 已实跑创建素材、jie6 投放经 CLI 打通；性能路线图 Phase 1–4 已接线。最新现状以 `docs/工作全景报告-2026-06-25.md` 为准。
 
 ## 快速上手
 ```bash
@@ -21,8 +21,8 @@ node bin/weilai.mjs --help            # 命令总览
 ## 目录结构
 ```
 bin/weilai.mjs      CLI 入口 / 分发 / argv 护栏（拒中文）
-bin/cmds/           各子命令（status 已实现，余为 Phase 1–4）
-lib/                共享库：config / state（Phase 2 起补 cdp/session/sync/upload/submit/delete/telemetry/guard）
+bin/cmds/           各子命令（全部已实现：status/ready/sync/delete/md5fix/prep/upload/test-round/deliver-round/cycle/monitor/stats/passrate/close）
+lib/                共享库：config/state/cdp/session/guard/sync/upload/submit/delete/md5fix/telemetry/bandit/concurrency/log（均已建）
 targets/            通道配置 jie3.json / jie6.json（账户/计划/端口/模式/maxUploads）
 system.json         机器 + 项目级配置（项目根、关键词、chrome、ffmpeg、路径、超时、并发）
 docs/               PLAN（设计底稿）/ ARCHITECTURE / OPERATING / RECOVERY
