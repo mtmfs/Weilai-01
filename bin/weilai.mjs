@@ -12,6 +12,8 @@ import { runReconcileCmd } from './cmds/reconcile.mjs';
 import { runUploadCmd } from './cmds/upload.mjs';
 import { runTestRound, runDeliverRound } from './cmds/rounds.mjs';
 import { runCycle } from './cmds/cycle.mjs';
+import { runRun } from './cmds/run.mjs';
+import { runClearLocalCmd } from './cmds/clearlocal.mjs';
 import { runMonitor } from './cmds/monitor.mjs';
 import { runStatsCmd } from './cmds/stats.mjs';
 import { runPassrate } from './cmds/passrate.mjs';
@@ -38,10 +40,12 @@ const COMMANDS = {
   stats: { phase: 4, run: runStatsCmd, help: '读录制 JSONL 出分时段请求/端点/时长报表' },
   passrate: { phase: 4, run: runPassrate, help: '读 submissions.jsonl 出分时段过审率 + Thompson(S5) 建议提交时段' },
   cycle: { phase: 4, run: runCycle, help: '多轮收敛: ready→{sync→delete(每轮腾槽)→md5fix→[upload]}×N; --rounds N --round-wait MIN --skip-upload' },
+  run: { phase: 5, run: runRun, help: '★常驻异步飞轮: 单进程并发驱动 jie3+jie6 + 后台改MD5, 自治收割/回灌/交接; --jie3|--jie6|--no-jie6 --poll-floor S --poll-ceil S' },
+  'clear-local': { phase: 5, run: runClearLocalCmd, help: '按台账清洗本地源文件: delivered→★彻底删除、scrapped→内容不合格/ + 删md5fix衍生（★默认 dry-run，--apply 才动盘）' },
 };
 
 // ★A2: 取值 flag。这些 flag 需要带值（`--seconds 600` 或 `--seconds=600`）；其余 `--xxx` 仍是布尔。
-const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min']);
+const VALUE_FLAGS = new Set(['seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min', 'poll-floor', 'poll-ceil', 'full-sync', 'batch']);
 function parseArgs(argv) {
   const flags = { json: false, dryRun: false, apply: false, help: false };
   const pos = [];
