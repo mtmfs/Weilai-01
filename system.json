@@ -53,6 +53,7 @@
     "fullSyncMin": 12,
     "deleteMin": 30,
     "reconcileMin": 30,
-    "md5fixPerChannelDir": true
+    "md5fixPerChannelDir": true,
+    "releaseMax": 10
   }
 }
