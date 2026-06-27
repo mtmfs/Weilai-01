@@ -5,7 +5,7 @@
 // ★敏感字段（aavid/planId/funded/maxUploads，驱动有钱号真实投放/支出）dry-run 时额外 ⚠ 告警。
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, loadTarget, REQUIRED_TARGET } from '../../lib/config.mjs';
+import { ROOT, loadTarget, REQUIRED_TARGET, labelToId } from '../../lib/config.mjs';
 import { saveJson, getByPath, setByPath, coerceScalar } from '../../lib/config-write.mjs';
 import { log, out } from '../../lib/log.mjs';
 
@@ -65,14 +65,14 @@ function doSet({ id, key, rawValue, apply, json }) {
 export async function runConfigCmd({ flags, pos }) {
   const action = pos[0];
   if (action === 'get') {
-    const [, id, key] = pos;
-    if (!id || !key) usageErr('用法: weilai config get <system|jie3|jie6> <a.b.c> [--json]');
-    doGet({ id, key, json: !!flags.json });
+    const [, label, key] = pos;
+    if (!label || !key) usageErr('用法: weilai config get <system|free|paid> <a.b.c> [--json]');
+    doGet({ id: labelToId(label), key, json: !!flags.json });
   } else if (action === 'set') {
-    const [, id, key, value] = pos;
-    if (!id || !key || value === undefined) usageErr('用法: weilai config set <system|jie3|jie6> <a.b.c> <value> [--apply]（默认 dry-run；中文值请手改 JSON）');
-    doSet({ id, key, rawValue: value, apply: !!flags.apply, json: !!flags.json });
+    const [, label, key, value] = pos;
+    if (!label || !key || value === undefined) usageErr('用法: weilai config set <system|free|paid> <a.b.c> <value> [--apply]（默认 dry-run；中文值请手改 JSON）');
+    doSet({ id: labelToId(label), key, rawValue: value, apply: !!flags.apply, json: !!flags.json });
   } else {
-    usageErr('用法: weilai config <get|set> <system|jie3|jie6> <a.b.c> [value] [--apply|--json]');
+    usageErr('用法: weilai config <get|set> <system|free|paid> <a.b.c> [value] [--apply|--json]');
   }
 }

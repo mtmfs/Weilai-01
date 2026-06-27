@@ -1,10 +1,10 @@
 // status：只读。载入配置 + 台账，输出分阶段/分通道汇总。Phase 0 不碰 Chrome。
-import { loadSystem, loadTarget, discoverChannelIds } from '../../lib/config.mjs';
+import { loadSystem, loadTarget, discoverChannelIds, labelToId } from '../../lib/config.mjs';
 import { loadState, summarize, ledgerExists } from '../../lib/state.mjs';
 
 export async function runStatus({ flags, pos }) {
   const sys = loadSystem();
-  const targetId = pos[0] || 'both';
+  const targetId = labelToId(pos[0] || 'both'); // free/paid → id；both 透传
   const ids = targetId === 'both' ? discoverChannelIds() : [targetId];
 
   const channels = {};

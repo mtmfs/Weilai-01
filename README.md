@@ -4,26 +4,27 @@
 
 千川双通道过审流水线 CLI。把 `I:\cdp-helper\` 的 138 个散脚本收敛成一个**配置驱动、可被非程序员安全驱动、可被维护者低成本演进**的 CLI。
 
-- **测试通道 jie3**（捷沅3 · 推商品 · 免费 · 暂停计划）：批量传视频筛「审核通过」。
-- **投放通道 jie6**（捷沅6 · 推直播间 · 真金 · 投放中）：把过审件搬过去真投放。
+- **测试通道 free**（= jie3 · 捷沅3 · 推商品 · 免费）：批量传视频筛「审核通过」。
+- **投放通道 paid**（= jie6 · 捷沅6 · 推直播间 · 真金 · 投放中 · **主管级**）：把过审件搬过去真投放。
 - **机器真源** = 本地双通道台账 `_video_state.json`。
 
 ## 当前状态
-**计划①②均落地、双通道闭环已 live 跑通**（jie3 筛过审 → jie6 真投放）。命令全部实现、多数已 live 验证：`status/ready/sync/delete/md5fix/prep/upload/test-round/deliver-round/cycle/monitor/stats/passrate/close`。upload 已实跑创建素材；**jie6 投放通道半残**（删除未实现、靠暖 profile 登录，见总报告 §6）。性能路线图 Phase 1–4 已接线。**现状以 `docs/工程总报告.md` 为准。**
+**双通道闭环已 live 跑通**（free 筛过审 → paid 真投放）。命令面 2026-06 重构：**裸命令默认 free**、付费 `paid` 通道主管级隔离（`WEILAI_SUPERVISOR=1` 解锁），旧名（test-round/deliver-round/stats/sweep…）全保留为别名。新增 `doctor/scan/whoami/open/inspect/login`。**paid 投放通道半残**（删除未实现、靠暖 profile 登录，见总报告 §6）。**现状以 `docs/工程总报告.md` 为准。**
 
 ## 快速上手
 ```bash
-node bin/weilai.mjs status --json     # 只读：台账分阶段/分通道汇总
-node bin/weilai.mjs status jie3       # 只看 jie3
-node bin/weilai.mjs --help            # 命令总览
+node bin/weilai.mjs doctor            # 环境自检（开工先跑）
+node bin/weilai.mjs status            # 只读：台账分阶段/分通道汇总（默认 both）
+node bin/weilai.mjs status free       # 只看 free(=jie3)
+node bin/weilai.mjs --help            # 分组命令总览（--help-all 含主管级/别名）
 ```
 
 ## 目录结构
 ```
-bin/weilai.mjs      CLI 入口 / 分发 / argv 护栏（拒中文）
-bin/cmds/           各子命令（全部已实现：status/ready/sync/delete/md5fix/prep/upload/test-round/deliver-round/cycle/monitor/stats/passrate/close）
-lib/                共享库：config/state/cdp/session/guard/sync/upload/submit/delete/md5fix/telemetry/bandit/concurrency/log（均已建）
-channels/           通道配置 jie3.json / jie6.json（账户/计划/端口/模式/maxUploads）
+bin/weilai.mjs      CLI 入口 / 声明式命令注册表 / 别名 / 主管闸 / 通道解析 / argv 护栏（拒中文）
+bin/cmds/           各子命令（看/会话/流水线/编排/维护/主管 六组；旧名保留为别名）
+lib/                共享库：config/state/cdp/session/guard/sync/upload/submit/delete/md5fix/clearlocal/telemetry/bandit/concurrency/tier/config-write/selectors/log
+channels/           通道配置 jie3.json(free) / jie6.json(paid)（账户/计划/端口 24601-2/模式/maxUploads）
 system.json         机器 + 项目级配置（项目根、关键词、chrome、ffmpeg、路径、超时、并发）
 docs/               工程总报告（权威总览）/ PLAN（设计底稿）/ archive（旧日报 + 已并入报告的参考文档）
 archive/            旧 probe 一次性件归档
