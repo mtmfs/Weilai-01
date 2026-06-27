@@ -1,11 +1,11 @@
 // status：只读。载入配置 + 台账，输出分阶段/分通道汇总。Phase 0 不碰 Chrome。
-import { loadSystem, loadTarget } from '../../lib/config.mjs';
+import { loadSystem, loadTarget, discoverChannelIds } from '../../lib/config.mjs';
 import { loadState, summarize, ledgerExists } from '../../lib/state.mjs';
 
 export async function runStatus({ flags, pos }) {
   const sys = loadSystem();
   const targetId = pos[0] || 'both';
-  const ids = targetId === 'both' ? ['jie3', 'jie6'] : [targetId];
+  const ids = targetId === 'both' ? discoverChannelIds() : [targetId];
 
   const channels = {};
   for (const id of ids) channels[id] = loadTarget(id); // 缺字段会抛 E_CONFIG

@@ -1,5 +1,5 @@
 // test-round / deliver-round —— 一轮业务（丛2）。组合横切层 ready + 叶子 sync/delete/md5fix/upload。
-import { loadConfig, loadSecrets } from '../../lib/config.mjs';
+import { loadConfig, loadSecrets, channelRegistry } from '../../lib/config.mjs';
 import { ready } from '../../lib/session.mjs';
 import { runSync } from '../../lib/sync.mjs';
 import { runDelete } from '../../lib/delete.mjs';
@@ -10,9 +10,9 @@ import { log, out } from '../../lib/log.mjs';
 
 // test-round(jie3): ready → sync → delete → md5fix → upload。★含真上传到 jie3（免费测试通道）。
 export async function runTestRound({ flags, pos }) {
-  const id = pos[0] || 'jie3';
-  if (id !== 'jie3') { const e = new Error('test-round 仅限 jie3（测试通道）；jie6 用 deliver-round'); e.code = 'E_USAGE'; throw e; }
+  const id = pos[0] || channelRegistry().testId;
   const cfg = loadConfig(id);
+  if (cfg.target.role !== 'test') { const e = new Error('test-round 仅限测试通道（role=test）；投放通道用 deliver-round'); e.code = 'E_USAGE'; throw e; }
   log.step('test-round ① ready'); await ready(cfg, { secrets: loadSecrets(), log });
   log.step('test-round ② sync'); const s = await runSync(cfg, { log });
   // ★穿 sync 刚拉的 platform 快照给 delete → 免其重复拉取（同账户 sync 已 guardEnter 过）。
@@ -30,7 +30,8 @@ export async function runTestRound({ flags, pos }) {
 // deliver-round(jie6): ready → sync → md5fix → upload（sealed→jie6 投放）。
 // ⚠️ jie6=有钱账户(投放中)且冷 profile 登录+创意tab 收敛未通 → 本命令结构完整但未 live 验证，谨慎。
 export async function runDeliverRound({ flags, pos }) {
-  const cfg = loadConfig('jie6');
+  const id = channelRegistry().delivId;
+  const cfg = loadConfig(id);
   log.warn('⚠️ deliver-round 操作 jie6（有钱账户·投放中）；jie6 登录/创意tab 未通，未 live 验证——谨慎，建议先 --skip-upload 走骨架。');
   log.step('deliver-round ① ready'); await ready(cfg, { secrets: loadSecrets(), log });
   log.step('deliver-round ② sync'); const s = await runSync(cfg, { log });
@@ -41,5 +42,5 @@ export async function runDeliverRound({ flags, pos }) {
   if (flags['skip-upload']) log.warn('upload 跳过（--skip-upload）');
   else up = await runUpload(cfg, { names, log });
   log.ok(`deliver-round 完成：注入 ${up.injected || 0} / 平台确认 ${up.submitted || 0}${up.dedup ? '（幂等跳过）' : ''}`);
-  if (flags.json) out({ command: 'deliver-round', target: 'jie6', sync: s.stages, upload: up });
+  if (flags.json) out({ command: 'deliver-round', target: id, sync: s.stages, upload: up });
 }

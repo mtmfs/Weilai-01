@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Weilai-01 CLI 入口：解析 argv、护栏、分发子命令。
-// 护栏：拒绝非 ASCII argv（中文走 targets/*.json，不走命令行）→ exit 2 (E_USAGE)。
+// 护栏：拒绝非 ASCII argv（中文走 channels/*.json，不走命令行）→ exit 2 (E_USAGE)。
 import { runStatus } from './cmds/status.mjs';
+import { runConfigCmd } from './cmds/config.mjs';
 import { runReady } from './cmds/ready.mjs';
 import { runClose } from './cmds/close.mjs';
 import { runSyncCmd } from './cmds/sync.mjs';
@@ -24,6 +25,7 @@ const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 // 命令注册表。phase 标注实现进度；run 为 undefined 即骨架占位。
 const COMMANDS = {
   status: { phase: 0, run: runStatus, help: '只读：台账分阶段汇总（支持 --json）' },
+  config: { phase: 3, run: runConfigCmd, help: '读写 system.json / channels/*.json（get/set；★set 默认 dry-run，--apply 才写·原子写+.bak）' },
   ready: { phase: 2, run: runReady, help: 'session 收敛到上传就绪（从任意页面，可自启动）' },
   close: { phase: 1, run: runClose, help: '优雅关闭目标通道的调试 Chrome（CDP Browser.close，只关该实例·绝不碰别的 chrome）' },
   sync: { phase: 3, run: runSyncCmd, help: '拉平台审核归台账（读平台+写台账，不动平台）' },
@@ -90,7 +92,7 @@ async function main() {
   // 护栏：拒绝非 ASCII argv。
   const bad = argv.find((a) => /[^\x00-\x7F]/.test(a));
   if (bad) {
-    console.error(`[E_USAGE] 命令行参数含非 ASCII 字符：「${bad}」。中文请写进 targets/*.json，命令行只用 ASCII 名（jie3/jie6）。`);
+    console.error(`[E_USAGE] 命令行参数含非 ASCII 字符：「${bad}」。中文请写进 channels/*.json，命令行只用 ASCII 名（jie3/jie6）。`);
     process.exit(EXIT.USAGE);
   }
 

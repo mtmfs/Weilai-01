@@ -23,7 +23,7 @@ node bin/weilai.mjs --help            # 命令总览
 bin/weilai.mjs      CLI 入口 / 分发 / argv 护栏（拒中文）
 bin/cmds/           各子命令（全部已实现：status/ready/sync/delete/md5fix/prep/upload/test-round/deliver-round/cycle/monitor/stats/passrate/close）
 lib/                共享库：config/state/cdp/session/guard/sync/upload/submit/delete/md5fix/telemetry/bandit/concurrency/log（均已建）
-targets/            通道配置 jie3.json / jie6.json（账户/计划/端口/模式/maxUploads）
+channels/           通道配置 jie3.json / jie6.json（账户/计划/端口/模式/maxUploads）
 system.json         机器 + 项目级配置（项目根、关键词、chrome、ffmpeg、路径、超时、并发）
 docs/               工程总报告（权威总览）/ PLAN（设计底稿）/ archive（旧日报 + 已并入报告的参考文档）
 archive/            旧 probe 一次性件归档

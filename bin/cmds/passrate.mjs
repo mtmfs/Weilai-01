@@ -1,10 +1,10 @@
 // passrate：读 submissions.jsonl 出分时段过审率 + audit latency + Thompson(S5) 建议提交时段。只读。
-import { loadConfig } from '../../lib/config.mjs';
+import { loadConfig, channelRegistry } from '../../lib/config.mjs';
 import { passRateStats, passRateArms } from '../../lib/telemetry.mjs';
 import { log, out } from '../../lib/log.mjs';
 
 export async function runPassrate({ flags, pos }) {
-  const id = pos[0] || 'jie3';
+  const id = pos[0] || channelRegistry().testId;
   const lp = loadConfig(id).system.project.ledgerPath;
   const s = passRateStats(lp);
   const a = passRateArms(lp);

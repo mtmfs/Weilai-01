@@ -58,7 +58,7 @@
 | 语言＝单 Node(我定) | 优化项全是 CDP/编排,无热点 → 单语言最省我维护;形态为常驻进程+CLI | 你点3/5,授权我定 |
 | 加遥测/监控 | 旁路被动记录 + 分时段统计 → 驱动择时 | 你点10 |
 | session 三层收敛 | 探针/动作/调度器,从任意页面收敛到就绪 | 你点4/5 |
-| 配置化 | 硬编码全外提 `targets/<name>.json`;argv 绝不传中文 | — |
+| 配置化 | 硬编码全外提 `channels/<name>.json`;argv 绝不传中文 | — |
 | 操作者＝非程序员 | 命令好记、破坏性默认 dry-run、失败靠重跑续跑、人看+JSON 双输出 | — |
 | skill 后置 | 旧 skill 先不管,CLI 稳定后配新 skill | 你点9 |
 | 盈利模式 parked | 见 §十五,后续再议 | 你点7 |
@@ -289,7 +289,7 @@ weilai-01/
 ├─ lib/
 │  ├─ cdp.mjs               继承 + 吸收 8 个去重模式(isVisible/synthClick/setInputValue/dismissModal/triggerNextPage/uploadFilesViaChooser/auditStatusSnapshot/replaySignature)
 │  ├─ state.mjs             继承(补 ms 级时间戳)
-│  ├─ config.mjs            新  载入 targets/*.json+system.json、校验
+│  ├─ config.mjs            新  载入 channels/*.json+system.json、校验
 │  ├─ guard.mjs             新  §十 韧性包装+退出码
 │  ├─ session.mjs           新  §五 探针+动作+ready 调度器(吸收 enter-plan/open-sucai/qc-setup)
 │  ├─ sync.mjs              重构合并 flat-sync+flatsync-jie6
@@ -300,7 +300,7 @@ weilai-01/
 │  ├─ telemetry.mjs         新  §七 旁路 recorder + 分时段统计(吸收 probe-recorder/netwatch/tabwatch)
 │  ├─ concurrency.mjs       新  p-limit 限流
 │  └─ log.mjs               新  人看 stderr + 机器 JSON stdout
-├─ targets/{jie3,jie6}.json 新  aavid/planId/advId/port/maxUploads/ui/kw/flatRoot/md5Dir/ffmpeg/channel
+├─ channels/{jie3,jie6}.json 新  aavid/planId/advId/port/maxUploads/ui/kw/flatRoot/md5Dir/ffmpeg/channel
 ├─ system.json             新  chromePath/端口/ledgerPath/并发/超时/per-file 超时
 ├─ docs/                   新  OPERATING.md / RECOVERY.md / ARCHITECTURE.md
 ├─ archive/                归档  ~70 probe-*.mjs

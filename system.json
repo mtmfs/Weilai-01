@@ -27,15 +27,14 @@
   "md5fix": {
     "outDir": "I:\\md5fix"
   },
-  "sso": {
-    "handshakeAdvId": "1862076853297476"
-  },
   "timeouts": {
     "perFileNoProgressSec": 8,
     "batchStallSec": 120,
     "keepAliveSec": 12,
     "pollSec": 4,
-    "patientMaxMin": 15
+    "patientMaxMin": 15,
+    "rebumpWindowMin": 30,
+    "reconcileGraceMin": 30
   },
   "concurrency": {
     "ffmpegWorkers": 4,

@@ -1,14 +1,16 @@
 // bin/cmds/run.mjs —— `weilai run`：常驻异步飞轮（替代多轮 cycle 的同步阻塞 sleep 空转）。
 // 默认双通道；--jie3/--jie6 显式单选；--no-jie6 排除。SIGINT/SIGTERM 优雅停（等在途收尾，★绝不杀 Chrome）。
 import { runFlywheel } from '../../lib/flywheel.mjs';
+import { channelRegistry } from '../../lib/config.mjs';
 import { log } from '../../lib/log.mjs';
 
 export async function runRun({ flags }) {
-  // 通道选择：显式 --jie3/--jie6 → 白名单；否则默认双通道、--no-jieX 排除。
+  // 通道选择：显式 --<通道> → 白名单；否则默认双通道、--no-<通道> 排除（通道名取自 channels/*.json）。
+  const ids = channelRegistry().ids;
   let channels;
-  if (flags.jie3 || flags.jie6) channels = ['jie3', 'jie6'].filter(c => flags[c]);
-  else channels = ['jie3', 'jie6'].filter(c => !flags['no-' + c]);
-  if (!channels.length) { const e = new Error('用法: weilai run [--jie3|--jie6|--no-jie6] [--poll-floor S] [--poll-ceil S] [--full-sync MIN]'); e.code = 'E_USAGE'; throw e; }
+  if (ids.some(c => flags[c])) channels = ids.filter(c => flags[c]);
+  else channels = ids.filter(c => !flags['no-' + c]);
+  if (!channels.length) { const e = new Error(`用法: weilai run [--<通道>|--no-<通道>] [--poll-floor S] [--poll-ceil S] [--full-sync MIN]（通道: ${ids.join('|')}）`); e.code = 'E_USAGE'; throw e; }
 
   // CLI 覆盖（其余取 system.json.daemon / flywheel.DAEMON_DEFAULTS）。
   const daemon = {};

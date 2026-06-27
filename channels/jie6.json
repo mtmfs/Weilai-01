@@ -9,5 +9,6 @@
   "port": 9223,
   "ui": "creative-tab",
   "funded": true,
-  "maxUploads": 3
+  "maxUploads": 3,
+  "profileSuffix": "-jie6"
 }

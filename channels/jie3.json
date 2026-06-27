@@ -9,5 +9,6 @@
   "port": 9222,
   "ui": "drawer",
   "funded": false,
-  "maxUploads": 7
+  "maxUploads": 7,
+  "profileSuffix": ""
 }

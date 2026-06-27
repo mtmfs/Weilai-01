@@ -1,11 +1,11 @@
 // stats：读 monitor 录的 JSONL，出分时段(hour-of-day) 请求/端点/错误率/时长报表。
 import { join } from 'node:path';
-import { ROOT } from '../../lib/config.mjs';
+import { ROOT, channelRegistry } from '../../lib/config.mjs';
 import { statsFromFile } from '../../lib/telemetry.mjs';
 import { log, out } from '../../lib/log.mjs';
 
 export async function runStatsCmd({ flags, pos }) {
-  const id = pos[0] || 'jie3';
+  const id = pos[0] || channelRegistry().testId;
   const file = flags.file || join(ROOT, 'telemetry-out', `rec-${id}.jsonl`);
   const res = statsFromFile(file);
   if (flags.json) { out({ command: 'stats', file, ...res }); return; }
