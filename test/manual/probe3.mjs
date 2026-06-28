@@ -1,4 +1,4 @@
-import { connect } from '../lib/cdp.mjs';
+import { connect } from '../../lib/cdp.mjs';
 const port = +(process.argv[2] || 9223), aavid = process.argv[3] || '1862076853297476';
 const list = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).filter(t => t.type === 'page');
 console.log('tabs on ' + port + ':'); list.forEach(t => console.log('  -', (t.url || '').replace(/&amp;/g, '&').slice(0, 85)));

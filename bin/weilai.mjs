@@ -25,7 +25,7 @@ import { runWhoami } from './cmds/whoami.mjs';
 import { runDoctor } from './cmds/doctor.mjs';
 import { runInspect } from './cmds/inspect.mjs';
 import { runLogin } from './cmds/login.mjs';
-import { channelRegistry } from '../lib/config.mjs';
+import { channelRegistry, labelToId } from '../lib/config.mjs';
 import { supervisorUnlocked } from '../lib/tier.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 
@@ -47,13 +47,13 @@ const COMMANDS = {
   'monitor-report': { group: '看', run: runStatsCmd,      channel: 'free', danger: 'read',     help: '读 monitor 录制出分时段请求/时延/错误率报表', aliases: ['stats', 'traffic'] },
   passrate:         { group: '看', run: runPassrate,      channel: 'free', danger: 'read',     help: '过审率 + 审核时延 + 建议提交时段' },
   monitor:          { group: '看', run: runMonitor,       channel: 'free', danger: 'read',     help: '旁路被动录制网络请求到文件' },
-  scan:             { group: '看', run: runScan,          channel: 'none', danger: 'read',     help: '扫各通道调试 Chrome 在不在跑 + 是否本号', aliases: ['ps'] },
+  scan:             { group: '看', run: runScan,          channel: 'none', danger: 'read',     help: '扫各通道调试 Chrome 在不在跑 + aavid 标签是否在位', aliases: ['ps'] },
   doctor:           { group: '看', run: runDoctor,        channel: 'none', danger: 'read',     help: '环境自检：磁盘/ffmpeg/chrome/端口/台账/通道（--fix 探测修补 system.json）', aliases: ['preflight'] },
   // ── 会话（浏览器）──
   ready:            { group: '会话', run: runReady,       channel: 'free', danger: 'browser',  help: '收敛到上传就绪（可自启 Chrome）' },
   open:             { group: '会话', run: runOpen,        channel: 'free', danger: 'browser',  help: '只启动 Chrome 实例、不收敛（ready 挂了的逃生口）' },
   close:            { group: '会话', run: runClose,       channel: 'free', danger: 'browser',  help: '优雅关该通道调试 Chrome（不杀别的）' },
-  whoami:           { group: '会话', run: runWhoami,      channel: 'free', danger: 'browser',  help: '探当前登录账户（config 的 account 为空则回填）' },
+  whoami:           { group: '会话', run: runWhoami,      channel: 'free', danger: 'browser',  help: '检查通道标签/会话（账户名探针已禁用，不回填）' },
   login:            { group: '会话', run: runLogin,       channel: 'none', danger: 'local',    help: '交互式录入端口/凭据/双通道标识（双模·无汉字）' },
   // ── 流水线（叶子）──
   sync:             { group: '流水线', run: runSyncCmd,   channel: 'free', danger: 'ledger',   help: '拉平台审核归台账（不改平台）' },
@@ -103,8 +103,14 @@ function parseArgs(argv) {
       if (eq !== -1) flags[a.slice(2, eq)] = a.slice(eq + 1);
       else {
         const name = a.slice(2);
-        if (VALUE_FLAGS.has(name) && i + 1 < argv.length && !argv[i + 1].startsWith('--')) flags[name] = argv[++i];
-        else flags[name] = true;
+        if (VALUE_FLAGS.has(name)) {
+          if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) {
+            const e = new Error(`--${name} 需要一个值`);
+            e.code = 'E_USAGE';
+            throw e;
+          }
+          flags[name] = argv[++i];
+        } else flags[name] = true;
       }
     } else pos.push(a);
   }
@@ -117,8 +123,9 @@ function parseArgs(argv) {
 function resolveTargets(entry, flags) {
   const reg = channelRegistry();
   if (flags.as) {
-    if (!reg.ids.includes(flags.as)) { const e = new Error(`未知通道 --as ${flags.as}（可用: ${reg.ids.join('|')}）`); e.code = 'E_USAGE'; throw e; }
-    return { ids: [flags.as], touchesPaid: flags.as === reg.delivId };
+    const id = labelToId(flags.as);
+    if (!reg.ids.includes(id)) { const e = new Error(`未知通道 --as ${flags.as}（可用: free|paid|${reg.ids.join('|')}）`); e.code = 'E_USAGE'; throw e; }
+    return { ids: [id], touchesPaid: id === reg.delivId };
   }
   if (entry.channel === 'paid') return { ids: [reg.delivId], touchesPaid: true };
   if (entry.channel === 'both') return { ids: reg.ids, touchesPaid: true };
@@ -151,9 +158,24 @@ function usage(showAll = false) {
   return lines.join('\n');
 }
 
+function exitWithError(e) {
+  const code = e && e.code;
+  if (code && CODE_TO_EXIT[code] !== undefined) {
+    console.error(`[${code}] ${e.message}`);
+    process.exit(CODE_TO_EXIT[code]);
+  }
+  console.error(`[ERROR] ${(e && e.stack) || e}`);
+  process.exit(EXIT.RUNTIME);
+}
+
 async function main() {
   const argv = process.argv.slice(2);
-  const { flags, pos } = parseArgs(argv);
+  let flags, pos;
+  try {
+    ({ flags, pos } = parseArgs(argv));
+  } catch (e) {
+    exitWithError(e);
+  }
   let cmd = pos[0];
   if (cmd && ALIAS[cmd]) cmd = ALIAS[cmd]; // 别名 → 规范名
 
@@ -194,6 +216,11 @@ async function main() {
     }
 
     const restPos = pos.slice(1);
+    if (needsResolve && restPos.length) {
+      const e = new Error(`命令 \`${cmd}\` 不接受裸参数「${restPos.join(' ')}」；请选择 \`${cmd}-paid\`、\`--as free|paid\`，或使用该命令明确支持的参数。`);
+      e.code = 'E_USAGE';
+      throw e;
+    }
     if (entry.passChannels) {
       // run* 用通道 id 列表（runRun 再叠加 legacy --jie3/--jie6 + 主管闸）。
       await entry.run({ flags, pos: restPos, channels: targets.ids });
@@ -205,13 +232,7 @@ async function main() {
       await entry.run({ flags, pos: restPos });
     }
   } catch (e) {
-    const code = e && e.code;
-    if (code && CODE_TO_EXIT[code] !== undefined) {
-      console.error(`[${code}] ${e.message}`);
-      process.exit(CODE_TO_EXIT[code]);
-    }
-    console.error(`[ERROR] ${(e && e.stack) || e}`);
-    process.exit(EXIT.RUNTIME);
+    exitWithError(e);
   }
 }
 

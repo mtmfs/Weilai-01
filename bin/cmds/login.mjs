@@ -1,5 +1,5 @@
 // login：交互式录入端口/凭据/双通道标识（双模·全程无汉字）。
-// ★账户名(汉字)不输入——保留现有 channels/*.json 的 account；为空则登录后由 whoami/probeAccount 回填。
+// ★账户名(汉字)不输入——保留现有 channels/*.json 的 account；运行期身份靠 aavid/planId 校验，不再回填 account。
 //   只收 ASCII（port/email/pwd/aavid/planId/maxUploads，free+paid 各一组）→ 不碰 argv ASCII 铁律。
 // TTY → 逐项 prompt（密码不回显）；非 TTY → 读 flag（防 AI 驱动卡死）。
 // 写盘：channel 字段→channels/{free,paid 解析到的 id}.json（saveJson 原子+.bak）、凭据→secrets.json。
@@ -8,8 +8,6 @@ import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { ROOT, channelRegistry, loadTarget } from '../../lib/config.mjs';
 import { saveJson } from '../../lib/config-write.mjs';
-import { connect } from '../../lib/cdp.mjs';
-import { probeChromePort, probeTab, waitAccount } from '../../lib/session.mjs';
 import { log, out } from '../../lib/log.mjs';
 
 const DEF_PORT = { free: 24601, paid: 24602 };
@@ -85,24 +83,10 @@ async function commit({ free, paid, email, pwd, log: L }) {
   for (const { role, id, obj } of prepared) {
     saveJson(join(ROOT, 'channels', `${id}.json`), obj);
     written.push({ role, id, port: obj.port });
-    L.ok(`已写 channels/${id}.json（${role}·port=${obj.port}·account 保留=${obj.account || '空(待回填)'}）`);
+    L.ok(`已写 channels/${id}.json（${role}·port=${obj.port}·account 保留=${obj.account || '空'}）`);
   }
   if (email && pwd) { writeSecrets(email, pwd); L.ok('已写 secrets.json（mother 凭据·gitignored·原子+.bak）'); }
   else L.warn('未提供邮箱/密码，secrets.json 未改');
-  // 尽力而为读回账户（仅 Chrome 已在该页时；否则提示后续 whoami）。
-  for (const w of written) {
-    try {
-      if (!await probeChromePort(w.port)) { L.info(`  ${w.role}(${w.id}) :${w.port} 未在跑——\`ready ${w.role}\` 登录后 \`whoami ${w.role}\` 回填/确认账户`); continue; }
-      const t = loadTarget(w.id); const tab = await probeTab(w.port, t.aavid);
-      if (!tab) { L.info(`  ${w.role}(${w.id}) 在跑但未导航到本号——\`ready ${w.role}\` 后 \`whoami ${w.role}\``); continue; }
-      let cdp, acc = '?'; try { cdp = await connect({ port: w.port, aavid: t.aavid }); acc = await waitAccount(cdp, 6000); } finally { if (cdp) cdp.close(); }
-      if (acc && acc !== '?') {
-        L.ok(`  识别到 ${w.role} 账户：${acc}`);
-        if (!t.account) { t.account = acc; saveJson(join(ROOT, 'channels', `${w.id}.json`), t); L.ok(`  已回填 account=${acc}（断言基线）`); }
-        else if (acc !== t.account) L.warn(`  ⚠ 识别账户 ${acc} ≠ config ${t.account}`);
-      }
-    } catch (e) { L.warn(`  ${w.role} 账户读回失败：${String(e.message || e).slice(0, 50)}`); }
-  }
   return written;
 }
 
@@ -159,6 +143,6 @@ export async function runLogin({ flags }) {
   }
   const written = await commit({ ...input, log });
   if (!written.length) log.warn('未写入任何通道（未提供 aavid/planId）');
-  else log.ok(`login 完成：配置 ${written.map(w => w.role).join('+')}。下一步：\`ready free\` 登录就绪 → \`whoami free\` 确认账户。`);
+  else log.ok(`login 完成：配置 ${written.map(w => w.role).join('+')}。下一步：\`ready free\` 登录就绪 → \`scan\` 确认标签。`);
   if (flags.json) out({ command: 'login', written });
 }

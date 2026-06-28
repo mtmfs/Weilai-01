@@ -21,34 +21,72 @@ function run(args, env = {}) {
 function sha(p) {
   return existsSync(p) ? createHash('sha1').update(readFileSync(p)).digest('hex') : null;
 }
+function assertExit(args, status, msg, env = {}) {
+  const r = run(args, env);
+  assert.strictEqual(r.status, status, `${msg}，实际 ${r.status}\nSTDERR:\n${r.stderr}\nSTDOUT:\n${r.stdout}`);
+  return r;
+}
 
 {
-  const r = run(['hold-submit', '--json']);
-  assert.strictEqual(r.status, 64, `hold-submit 应退出 64，实际 ${r.status}: ${r.stderr}`);
+  const r = assertExit(['hold-submit', '--json'], 64, 'hold-submit 应退出 64');
   assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'hold-submit JSON 应保留 implemented=false');
   console.log('✓ hold-submit 桩退出 64 且 JSON 保持');
 }
 
 {
-  const r = run(['delete-paid', '--json'], { WEILAI_SUPERVISOR: '1' });
-  assert.strictEqual(r.status, 64, `delete-paid 桩应退出 64，实际 ${r.status}: ${r.stderr}`);
+  const r = assertExit(['delete-paid', '--json'], 64, 'delete-paid 桩应退出 64', { WEILAI_SUPERVISOR: '1' });
   assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'delete-paid JSON 应保留 implemented=false');
   console.log('✓ delete-paid 桩解锁后退出 64 且 JSON 保持');
 }
 
-for (const [flag, value] of [['--batch', 'abc'], ['--poll-floor', '0'], ['--poll-ceil', '-1'], ['--full-sync', '1.5']]) {
-  const r = run(['run', flag, value]);
-  assert.strictEqual(r.status, 2, `run ${flag} ${value} 应 E_USAGE(2)，实际 ${r.status}`);
+{
+  const r = assertExit(['hold-submit', '--as', 'paid', '--json'], 64, 'hold-submit --as paid 解锁后应保持桩退出 64', { WEILAI_SUPERVISOR: '1' });
+  assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'hold-submit --as paid JSON 应保留 implemented=false');
+  assertExit(['hold-submit', '--as', '--json'], 2, '缺少 --as 值应 E_USAGE(2)');
+  console.log('✓ --as 标签解析和缺值错误符合预期');
 }
+
+for (const [flag, value] of [['--batch', 'abc'], ['--poll-floor', '0'], ['--poll-ceil', '-1'], ['--full-sync', '1.5']]) {
+  assertExit(['run', flag, value], 2, `run ${flag} ${value} 应 E_USAGE(2)`);
+}
+assertExit(['run', '--batch'], 2, 'run --batch 缺值应 E_USAGE(2)');
 console.log('✓ run 数字参数非法值均 E_USAGE');
+
+for (const args of [
+  ['run', 'paid'],
+  ['upload', 'paid', '--json'],
+]) {
+  assertExit(args, 2, `${args.join(' ')} 裸通道组合应 E_USAGE(2)`);
+}
+console.log('✓ 裸通道组合在进入业务逻辑前被拒绝');
+
+for (const args of [
+  ['cycle', '--rounds', 'abc'],
+  ['monitor', '--seconds', 'abc'],
+  ['reconcile', '--grace-min', 'abc'],
+]) {
+  assertExit(args, 2, `${args.join(' ')} 应 E_USAGE(2)`);
+}
+console.log('✓ cycle/monitor/reconcile 数字参数非法值均 E_USAGE');
 
 {
   const ch = join(ROOT, 'channels', 'jie3.json');
   const before = sha(ch);
-  const r = run(['login', '--email', 'a@example.com', '--pwd', 'pw', '--free-aavid', '1', '--free-plan', '2', '--free-port', 'abc']);
-  assert.strictEqual(r.status, 2, `login 非法 port 应 E_USAGE(2)，实际 ${r.status}`);
+  assertExit(['login', '--email', 'a@example.com', '--pwd', 'pw', '--free-aavid', '1', '--free-plan', '2', '--free-port', 'abc'], 2, 'login 非法 port 应 E_USAGE(2)');
   assert.strictEqual(sha(ch), before, 'login 非法 port 不应写 channels/jie3.json');
-  console.log('✓ login 非法 port 写前拒绝且不改配置');
+  assertExit(['login', '--email', 'a@example.com', '--pwd', 'pw', '--free-aavid', '1', '--free-plan', '2', '--free-max', 'abc'], 2, 'login 非法 maxUploads 应 E_USAGE(2)');
+  assert.strictEqual(sha(ch), before, 'login 非法 maxUploads 不应写 channels/jie3.json');
+  console.log('✓ login 非法 port/maxUploads 写前拒绝且不改配置');
+}
+
+{
+  const ch = join(ROOT, 'channels', 'jie3.json');
+  const before = sha(ch);
+  assertExit(['config', 'set', 'free', 'port', '70000', '--apply'], 2, 'config set 非法 port 应 E_USAGE(2)');
+  assert.strictEqual(sha(ch), before, 'config set 非法 port 不应写 channels/jie3.json');
+  assertExit(['config', 'set', 'free', 'maxUploads', '0', '--apply'], 2, 'config set 非法 maxUploads 应 E_USAGE(2)');
+  assert.strictEqual(sha(ch), before, 'config set 非法 maxUploads 不应写 channels/jie3.json');
+  console.log('✓ config set 非法 port/maxUploads 写前拒绝且不改配置');
 }
 
 console.log('\ncli-behavior 全部通过 ✓');

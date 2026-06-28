@@ -1,6 +1,6 @@
-// test/interferer.mjs —— 「不定期干扰」worker。随机间隔(7-23s)随机扰动 jie3：乱跳转/顶登录/乱点/弹窗/诱饵标签。
+// test/manual/interferer.mjs —— 「不定期干扰」worker。随机间隔(7-23s)随机扰动 jie3：乱跳转/顶登录/乱点/弹窗/诱饵标签。
 // 跑到 14:00。安全：乱点排除破坏性文案；只动 jie3(免费/暂停)，不碰 jie6。
-import { connect, connectBrowser } from '../lib/cdp.mjs';
+import { connect, connectBrowser } from '../../lib/cdp.mjs';
 import { appendFileSync, mkdirSync } from 'node:fs';
 const ROOT = 'I:\\weilai-01', OUT = ROOT + '\\test-out'; mkdirSync(OUT, { recursive: true });
 const LOG = OUT + '\\interferer.jsonl';

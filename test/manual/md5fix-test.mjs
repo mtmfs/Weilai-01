@@ -1,7 +1,7 @@
 // 一次性：对 flatRoot 里前 3 个 KW 视频改 MD5，输出到 I:\md5fix-test，验证并行 + 哈希真变。
-import { loadConfig } from '../lib/config.mjs';
-import { runMd5fix } from '../lib/md5fix.mjs';
-import { log } from '../lib/log.mjs';
+import { loadConfig } from '../../lib/config.mjs';
+import { runMd5fix } from '../../lib/md5fix.mjs';
+import { log } from '../../lib/log.mjs';
 import { readdirSync } from 'node:fs';
 const cfg = loadConfig('jie3');
 const root = cfg.system.project.flatRoot, kw = cfg.system.project.kw;

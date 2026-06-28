@@ -1,11 +1,11 @@
-// test/chaos.mjs —— 生产环境故障模拟·混沌测试。循环跑到 14:00，记录 bug 不修。
+// test/manual/chaos.mjs —— 生产环境故障模拟·混沌测试。循环跑到 14:00，记录 bug 不修。
 // 安全：随机点击只在 jie3(免费/暂停)且排除破坏性文案；jie6 只做导航扰动，不乱点。
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, appendFileSync } from 'node:fs';
-import { connect, connectBrowser } from '../lib/cdp.mjs';
-import { probeAccount, probeUrl, probeView, listTabs } from '../lib/session.mjs';
-import { guard } from '../lib/guard.mjs';
-import { loadConfig } from '../lib/config.mjs';
+import { connect, connectBrowser } from '../../lib/cdp.mjs';
+import { probeAccount, probeUrl, probeView, listTabs } from '../../lib/session.mjs';
+import { guard } from '../../lib/guard.mjs';
+import { loadConfig } from '../../lib/config.mjs';
 
 const ROOT = 'I:\\weilai-01';
 const OUT = ROOT + '\\test-out';
@@ -55,12 +55,12 @@ const J6 = `https://qianchuan.jinritemai.com/uni-prom?aavid=${A6}`;
 
 // ── 场景 ──────────────────────────────────────────────
 async function S0_baseline() {
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   rec({ scenario: 'S0_baseline', code: r.code, ok: r.code === 0, tail: r.out.trim().split('\n').pop() });
 }
 async function S1_multiWindow() {
   await openDecoy(9222, J6); // 捷沅6 诱饵标签
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   // 验诱饵 1862 标签账户仍是捷沅6、未被 jie3 操作搞乱
   const decoy = await drive(9222, { aavid: A6 }, async cdp => probeAccount(cdp).catch(() => '?'));
   const touchedWrong = r.code === 0 && decoy && decoy !== '捷沅6' && decoy !== '?';
@@ -68,7 +68,7 @@ async function S1_multiWindow() {
 }
 async function S2_navDisrupt() {
   const before = await nav(9222, { aavid: A3 }, 'about:blank', 3000);
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   rec({ scenario: 'S2_navDisrupt', disruptedTo: before, code: r.code, ok: r.code === 0, note: r.code === 0 ? '自愈重收敛' : '未自愈' });
 }
 async function S3_clickChaos() {
@@ -76,7 +76,7 @@ async function S3_clickChaos() {
     return cdp.j(`let done=[];const cand=[...document.querySelectorAll('button,a,[role=tab],.tab-label,span')].filter(e=>__vis(e)&&!/删除|移除|确定|确认|解除|停用|删|提交|开启/.test((e.innerText||''))&&(e.innerText||'').trim().length>0&&(e.innerText||'').length<12);for(let i=0;i<2&&cand.length;i++){const el=cand[Math.floor(cand.length*((i+1)/3))];if(el){done.push((el.innerText||'').trim().slice(0,8));__synthClick(el);}}return JSON.stringify(done);`).then(s => JSON.parse(s || '[]')).catch(() => []);
   });
   await sleep(2500);
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   rec({ scenario: 'S3_clickChaos', clicked, code: r.code, ok: r.code === 0, note: r.code === 0 ? '乱点后恢复' : '乱点后未恢复' });
 }
 async function S4_topLogin() {
@@ -88,25 +88,25 @@ async function S4_topLogin() {
     const cfg = loadConfig('jie3');
     guardOut = await drive(9222, { urlSub: '' }, async cdp => guard(cdp, cfg, async () => 'op', { allowRecover: false }).then(() => 'PASSED(疑漏检)').catch(e => e.code || String(e.message)));
   } catch (e) { guardOut = { err: String(e.message || e) }; }
-  const r = cli(['ready', 'jie3']); // ready 应正确停(无凭据→E_LOGIN) 或自愈
+  const r = cli(['ready', '--as', 'free']); // ready 应正确停(无凭据→E_LOGIN) 或自愈
   const safe = guardOut === 'E_LOGIN' || guardOut === 'E_SIG' || guardOut === 'E_DRIFT' || (guardOut && guardOut.err);
   rec({ scenario: 'S4_topLogin', drivenTo: (u || '').slice(0, 50), guard: guardOut, readyCode: r.code, BUG: (guardOut === 'PASSED(疑漏检)') ? 'guard 漏检掉登录' : null, ok: !!safe });
 }
 async function S5_driftAccount() {
   await nav(9222, { aavid: A3 }, J6, 7000); // 把"jie3 标签"导到 1862（模拟漂移）
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   // ready 后应有干净的 1849 标签且账户=捷沅3；绝不在 1862 上操作
   const j3 = await drive(9222, { aavid: A3 }, async cdp => probeAccount(cdp).catch(() => '?'));
   rec({ scenario: 'S5_driftAccount', readyCode: r.code, jie3Account: j3, BUG: (j3 && j3 !== '捷沅3' && j3 !== '?') ? '1849 标签账户异常' : null, ok: r.code === 0 && (j3 === '捷沅3' || j3 === '?') });
 }
 async function S6_popup() {
   await drive(9222, { aavid: A3 }, async cdp => cdp.ev(`(function(){const d=document.createElement('div');d.className='tools-vmok-plugin-modal__mask chaos-fake';d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.4)';const x=document.createElement('span');x.className='tools-vmok-plugin-modal__close-icon';x.style.cssText='position:fixed;top:20px;right:20px;width:24px;height:24px;background:#fff';d.appendChild(x);document.body.appendChild(d);return 'injected';})()`));
-  const r = cli(['ready', 'jie3']);
+  const r = cli(['ready', '--as', 'free']);
   const gone = await drive(9222, { aavid: A3 }, async cdp => cdp.ev(`!document.querySelector('.chaos-fake')`));
   rec({ scenario: 'S6_popup', readyCode: r.code, popupGone: gone, BUG: gone === false ? 'closePopup 没清掉假弹窗' : null, ok: r.code === 0 });
 }
 async function S7_twoInstance() {
-  const r = cli(['ready', 'jie6']); // jie6 配置 port=9223，新 profile 大概率未登录
+  const r = cli(['ready', '--as', 'paid']); // paid 配置 port=9223，新 profile 大概率未登录
   rec({ scenario: 'S7_twoInstance', code: r.code, tail: r.out.trim().split('\n').slice(-2).join(' | '), note: r.code === 11 ? 'jie6 新实例需登录(E_LOGIN) — 预期/待报告' : ('code=' + r.code) });
 }
 

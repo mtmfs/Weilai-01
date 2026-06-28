@@ -1,5 +1,5 @@
 // 试恢复 jie3：新开 tab 直接 nav uni-prom?aavid=1849，等 18s，看是落 捷沅3 还是被弹回 捷沅6。
-import { connectBrowser, connect } from '../lib/cdp.mjs';
+import { connectBrowser, connect } from '../../lib/cdp.mjs';
 const b = await connectBrowser(9222);
 await b.send('Target.createTarget', { url: 'https://qianchuan.jinritemai.com/uni-prom?aavid=1849209213181706' });
 b.close();

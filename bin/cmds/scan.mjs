@@ -1,7 +1,6 @@
-// scan：扫各通道调试 Chrome 在不在跑 + 是不是本号（陌生占用告警 + 端口体检）。只读。
+// scan：扫各通道调试 Chrome 在不在跑 + aavid 标签是否在位。只读。
 import { channelRegistry, loadTarget } from '../../lib/config.mjs';
-import { connect } from '../../lib/cdp.mjs';
-import { probeChromePort, probeTab, probeAccount } from '../../lib/session.mjs';
+import { probeChromePort, probeTab } from '../../lib/session.mjs';
 import { log, out } from '../../lib/log.mjs';
 
 export async function runScan({ flags }) {
@@ -17,12 +16,7 @@ export async function runScan({ flags }) {
       const tab = await probeTab(t.port, t.aavid);
       if (!tab) status = '在跑·无本号标签（可能陌生占用/未导航到本号）';
       else {
-        let cdp;
-        try { cdp = await connect({ port: t.port, aavid: t.aavid }); account = await probeAccount(cdp); }
-        catch (e) { account = '?'; }
-        finally { if (cdp) cdp.close(); }
-        const ours = account && account !== '?' && (!t.account || account === t.account);
-        status = ours ? `本号 ${account} ✓` : (account === '?' ? '在跑·账户未渲染' : `⚠陌生账户 ${account}（期望 ${t.account}）`);
+        status = '在跑·本号标签在位（账户名探针已禁用）';
       }
     }
     rows.push({ id, role, port: t.port, up, account, status });

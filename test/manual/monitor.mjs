@@ -1,6 +1,6 @@
-// test/monitor.mjs —— 「监视器」worker。每 5s 轮询 9222 页面状态(up/标签数/URL)，每 ~30s 深读一个 1849 标签账户。
+// test/manual/monitor.mjs —— 「监视器」worker。每 5s 轮询 9222 页面状态(up/标签数/URL)，每 ~30s 深读一个 1849 标签账户。
 // 状态变化或出现 DANGER(1849 标签显示非捷沅3 / 关键异常) 才记录，避免刷屏。跑到 14:00。
-import { connect } from '../lib/cdp.mjs';
+import { connect } from '../../lib/cdp.mjs';
 import { appendFileSync, mkdirSync } from 'node:fs';
 const ROOT = 'I:\\weilai-01', OUT = ROOT + '\\test-out'; mkdirSync(OUT, { recursive: true });
 const LOG = OUT + '\\monitor.jsonl';

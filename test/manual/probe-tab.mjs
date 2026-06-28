@@ -1,5 +1,5 @@
 // 一次性诊断：当前 9222 上 1849 标签到底显示什么（账户/开通页/加载态）。
-import { connect } from '../lib/cdp.mjs';
+import { connect } from '../../lib/cdp.mjs';
 const cdp = await connect({ port: 9222, aavid: '1849209213181706' });
 await cdp.send('Runtime.enable');
 const out = {

@@ -13,13 +13,24 @@ import { log, out } from '../../lib/log.mjs';
 // 待上传集：按 role 分派（投放取 deliv_*，否则 test_*）。
 const upNamesOf = (role, w) => role === 'delivery' ? [...w.deliv_toupload, ...w.deliv_reupload] : [...w.test_toupload, ...w.test_reupload];
 
+function positiveIntFlag(flags, name, fallback) {
+  if (flags[name] == null) return fallback;
+  const s = String(flags[name]);
+  if (!/^[1-9]\d*$/.test(s)) {
+    const e = new Error(`--${name} 必须是正整数，得到「${s}」`);
+    e.code = 'E_USAGE';
+    throw e;
+  }
+  return Number(s);
+}
+
 export async function runCycle({ flags, pos }) {
   const id = pos[0];
   assertChannel(id, '用法: weilai cycle [--rounds N] [--skip-upload] [--apply]');
   const cfg = loadConfig(id);
   const ledgerPath = cfg.system.project.ledgerPath;
   const isDelivery = cfg.target.role === 'delivery';
-  const rounds = Math.max(1, parseInt(flags.rounds, 10) || 1);
+  const rounds = positiveIntFlag(flags, 'rounds', 1);
   const trail = [];
 
   log.step(`cycle ① ready（${id}）`); await ready(cfg, { secrets: loadSecrets(), log });
