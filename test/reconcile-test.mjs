@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import { computeReconcile } from '../lib/reconcile.mjs';
 import { norm } from '../lib/cdp.mjs';
 import { recomputeStage, worklists, DEFAULT_CHANNELS, DEFAULT_PIPELINE } from '../lib/state.mjs';
+import { injectNameFilter } from '../lib/sync.mjs';
 
 const KW = '魏文彬', CH = 'jie3', NOW = 1_000_000_000_000;
 const GRACE = 30 * 60000;
@@ -68,5 +69,14 @@ console.log('✓ 断言2：un-bump 后 recomputeStage 正确归队（uploads→0
 const again = computeReconcile(state, platform, CH, KW, GRACE, NOW);
 assert.strictEqual(again.length, 0, `un-bump 后应无残留候选，实得 ${again.length}`);
 console.log('✓ 断言3：幂等——un-bump 后再对账候选为 0');
+
+// ── 断言 4：paid/creative-tab 路径复用 sync 的关键词过滤 helper ─────────────
+const rq = { postData: JSON.stringify({ Filters: { Conditions: [{ Field: 'old', Operator: 1, Values: ['x'] }] } }) };
+injectNameFilter(rq, KW);
+const body = JSON.parse(rq.postData);
+assert.ok(body.Filters.Conditions.some(c => c.Field === 'roi2_material_name_or_id' && c.Operator === 7 && c.Values[0] === KW), '应注入素材名关键词过滤');
+assert.strictEqual(body.Filters.Conditions.filter(c => c.Field === 'roi2_material_name_or_id').length, 1, '关键词过滤应幂等去重');
+assert.ok(!JSON.stringify(DEFAULT_CHANNELS).includes('捷沅'), '离线 DEFAULT_CHANNELS 不应含真实业务账号名');
+console.log('✓ 断言4：关键词过滤 helper 可用于 reconcile paid，且默认通道夹具已中性化');
 
 console.log('\nALL OK —— reconcile 离线单测全绿');

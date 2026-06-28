@@ -7,6 +7,11 @@ test-out/
 logs/
 *.local.json
 
+# 机器/账号真实配置本机持有；仓库只分发 *.example.json
+/system.json
+/channels/*.json
+!/channels/*.example.json
+
 # 台账与本地产物（位于 flatRoot / md5fix 目录，不应入库；此处兜底）
 _video_state.json
 _video_state.json.bak-*

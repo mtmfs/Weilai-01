@@ -1,0 +1,14 @@
+{
+  "id": "jie3",
+  "role": "test",
+  "account": "",
+  "aavid": "",
+  "advId": "",
+  "mode": "test-mode",
+  "planId": "",
+  "port": 24601,
+  "ui": "drawer",
+  "funded": false,
+  "maxUploads": 7,
+  "profileSuffix": ""
+}

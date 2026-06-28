@@ -9,6 +9,16 @@ import { supervisorUnlocked } from '../../lib/tier.mjs';
 import { log, enableFileLog } from '../../lib/log.mjs';
 
 const today = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+function positiveIntFlag(flags, name) {
+  if (flags[name] == null) return null;
+  const raw = String(flags[name]);
+  if (!/^[1-9]\d*$/.test(raw)) {
+    const e = new Error(`--${name} 必须是正整数，得到「${raw}」`);
+    e.code = 'E_USAGE';
+    throw e;
+  }
+  return Number(raw);
+}
 
 export async function runRun({ flags, channels: bound }) {
   const reg = channelRegistry();
@@ -29,11 +39,15 @@ export async function runRun({ flags, channels: bound }) {
 
   // CLI 覆盖（其余取 system.json.daemon / flywheel.DAEMON_DEFAULTS）。
   const daemon = {};
-  if (flags['poll-floor'] != null) daemon.pollFloorSec = Number(flags['poll-floor']);
-  if (flags['poll-ceil'] != null) daemon.pollCeilSec = Number(flags['poll-ceil']);
-  if (flags['full-sync'] != null) daemon.fullSyncMin = Number(flags['full-sync']);
+  const pollFloor = positiveIntFlag(flags, 'poll-floor');
+  const pollCeil = positiveIntFlag(flags, 'poll-ceil');
+  const fullSync = positiveIntFlag(flags, 'full-sync');
+  const batch = positiveIntFlag(flags, 'batch');
+  if (pollFloor != null) daemon.pollFloorSec = pollFloor;
+  if (pollCeil != null) daemon.pollCeilSec = pollCeil;
+  if (fullSync != null) daemon.fullSyncMin = fullSync;
   if (flags['no-md5-subdir']) daemon.md5fixPerChannelDir = false;
-  if (flags.batch != null) daemon.releaseMax = Number(flags.batch);
+  if (batch != null) daemon.releaseMax = batch;
 
   // 持久化日志：默认落仓库 logs/run-<日期>.log（零配置·长跑/无人值守事后诊断），WEILAI_LOG_FILE 可覆盖路径。
   const logPath = process.env.WEILAI_LOG_FILE || join(ROOT, 'logs', `run-${today()}.log`);

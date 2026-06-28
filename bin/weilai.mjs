@@ -190,7 +190,7 @@ async function main() {
     if (entry.impl === false || !entry.run) {
       if (flags.json) console.log(JSON.stringify({ command: cmd, implemented: false, note: entry.help }));
       else console.log(`命令 \`${cmd}\` 尚未实现（桩）。说明：${entry.help}`);
-      process.exit(EXIT.OK);
+      process.exit(CODE_TO_EXIT.E_NOT_IMPL);
     }
 
     const restPos = pos.slice(1);

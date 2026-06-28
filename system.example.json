@@ -1,13 +1,13 @@
 {
   "project": {
-    "name": "wei-6-18",
-    "kw": "魏文彬",
-    "flatRoot": "H:\\DD\\6-18-魏-指纹",
-    "ledgerPath": "H:\\DD\\6-18-魏-指纹\\_video_state.json"
+    "name": "example-project",
+    "kw": "PROJECT_KEYWORD",
+    "flatRoot": "D:\\weilai\\videos",
+    "ledgerPath": "D:\\weilai\\videos\\_video_state.json"
   },
   "chrome": {
     "path": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "profileBase": "I:\\chrome-debug-profile",
+    "profileBase": "D:\\weilai\\chrome-debug-profile",
     "flags": [
       "--no-proxy-server",
       "--no-first-run",
@@ -20,12 +20,11 @@
   },
   "ffmpeg": {
     "candidates": [
-      "D:\\app\\ffmpeg\\ffmpeg-8.1-essentials_build\\bin\\ffmpeg.exe",
       "ffmpeg"
     ]
   },
   "md5fix": {
-    "outDir": "I:\\md5fix"
+    "outDir": "D:\\weilai\\md5fix"
   },
   "timeouts": {
     "perFileNoProgressSec": 8,

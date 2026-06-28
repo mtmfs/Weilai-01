@@ -16,6 +16,24 @@ const DEF_PORT = { free: 24601, paid: 24602 };
 const DEF_MAX = { free: 7, paid: 3 };
 
 function usageErr(msg) { const e = new Error(msg); e.code = 'E_USAGE'; throw e; }
+function parsePort(raw, role) {
+  const s = String(raw);
+  if (!/^[1-9]\d*$/.test(s)) usageErr(`${role} port 必须是 1..65535 整数，得到「${s}」`);
+  const n = Number(s);
+  if (n < 1 || n > 65535) usageErr(`${role} port 必须是 1..65535 整数，得到「${s}」`);
+  return n;
+}
+function parsePositiveInt(raw, label) {
+  const s = String(raw);
+  if (!/^[1-9]\d*$/.test(s)) usageErr(`${label} 必须是正整数，得到「${s}」`);
+  return Number(s);
+}
+function normalizeFields(role, fields = {}) {
+  const out = { ...fields };
+  if (out.port != null && out.port !== '') out.port = parsePort(out.port, role);
+  if (out.max != null && out.max !== '') out.max = parsePositiveInt(out.max, `${role} maxUploads`);
+  return out;
+}
 
 // free/paid → 内部 id。v1 在既有通道上配置；channels 不合法则早失败（不做零起步 bootstrap）。
 function ids() {
@@ -35,8 +53,9 @@ function baseChannel(id, role) {
 function applyFields(obj, role, { aavid, planId, port, max }) {
   if (aavid) { obj.aavid = String(aavid); obj.advId = String(aavid); }
   if (planId) obj.planId = String(planId);
-  obj.port = Number(port || obj.port || DEF_PORT[role]);
-  if (max != null && max !== '') obj.maxUploads = Number(max);
+  obj.port = port != null && port !== '' ? port : parsePort(obj.port || DEF_PORT[role], role);
+  if (max != null && max !== '') obj.maxUploads = max;
+  else obj.maxUploads = parsePositiveInt(obj.maxUploads || DEF_MAX[role], `${role} maxUploads`);
   return obj;
 }
 
@@ -50,11 +69,20 @@ function writeSecrets(email, pwd) {
 
 async function commit({ free, paid, email, pwd, log: L }) {
   const map = ids();
-  const written = [];
+  free = normalizeFields('free', free);
+  paid = normalizeFields('paid', paid);
+  const prepared = [];
   for (const [role, fields] of [['free', free], ['paid', paid]]) {
-    if (!fields || (!fields.aavid && !fields.planId)) { L.warn(`${role} 通道：未提供 aavid/planId，跳过`); continue; }
+    if (!fields || (!fields.aavid && !fields.planId)) continue;
     const id = map[role];
     const obj = applyFields(baseChannel(id, role), role, fields);
+    prepared.push({ role, id, obj });
+  }
+  const written = [];
+  for (const role of ['free', 'paid']) {
+    if (!prepared.some(p => p.role === role)) L.warn(`${role} 通道：未提供 aavid/planId，跳过`);
+  }
+  for (const { role, id, obj } of prepared) {
     saveJson(join(ROOT, 'channels', `${id}.json`), obj);
     written.push({ role, id, port: obj.port });
     L.ok(`已写 channels/${id}.json（${role}·port=${obj.port}·account 保留=${obj.account || '空(待回填)'}）`);
