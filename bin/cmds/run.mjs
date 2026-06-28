@@ -2,10 +2,13 @@
 // 通道：`run`=免费(裸默认·dispatcher 传 [testId])；`run-paid`/`run-both`=主管级（dispatcher 传通道列表）。
 // 兼容旧 flag：--jie3/--jie6/--no-jie6（含付费号须 WEILAI_SUPERVISOR=1 解锁）。
 // SIGINT/SIGTERM 优雅停（等在途收尾，★绝不杀 Chrome）。
+import { join } from 'node:path';
 import { runFlywheel } from '../../lib/flywheel.mjs';
-import { channelRegistry } from '../../lib/config.mjs';
+import { ROOT, channelRegistry } from '../../lib/config.mjs';
 import { supervisorUnlocked } from '../../lib/tier.mjs';
-import { log } from '../../lib/log.mjs';
+import { log, enableFileLog } from '../../lib/log.mjs';
+
+const today = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
 
 export async function runRun({ flags, channels: bound }) {
   const reg = channelRegistry();
@@ -32,12 +35,18 @@ export async function runRun({ flags, channels: bound }) {
   if (flags['no-md5-subdir']) daemon.md5fixPerChannelDir = false;
   if (flags.batch != null) daemon.releaseMax = Number(flags.batch);
 
+  // 持久化日志：默认落仓库 logs/run-<日期>.log（零配置·长跑/无人值守事后诊断），WEILAI_LOG_FILE 可覆盖路径。
+  const logPath = process.env.WEILAI_LOG_FILE || join(ROOT, 'logs', `run-${today()}.log`);
+  const lf = enableFileLog(logPath);
+  if (lf) log.info(`📄 运行日志 → ${lf}`);
+
   const controller = new AbortController();
   let stopping = false;
   const stop = (sig) => { if (stopping) { log.warn(`再次 ${sig}：仍在收尾，请耐心（或手动 weilai close）`); return; } stopping = true; log.warn(`收到 ${sig}，优雅停止飞轮（等在途步骤收尾，★绝不杀 Chrome）...`); controller.abort(); };
   process.on('SIGINT', () => stop('SIGINT'));
   process.on('SIGTERM', () => stop('SIGTERM'));
 
-  log.step(`weilai run：常驻飞轮（通道 ${channels.join('+')}；Ctrl-C 优雅停）`);
+  log.step(`==== run 启动 ${new Date().toLocaleString()} · 通道 ${channels.join('+')} · pid ${process.pid}（Ctrl-C 优雅停）====`);
   await runFlywheel({ channels, log, daemon, signal: controller.signal });
+  log.step(`==== run 结束 ${new Date().toLocaleString()} · pid ${process.pid} ====`);
 }

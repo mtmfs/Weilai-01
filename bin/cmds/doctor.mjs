@@ -1,7 +1,11 @@
 // doctor：环境自检——磁盘(C/H/I)/ffmpeg/chrome/端口/台账/通道不变量。纯只读，直击"硬环境前提·缺一即停"。
-import { existsSync, statfsSync } from 'node:fs';
+// --fix：探测·修补 system.json（自动定 chrome/ffmpeg、补 md5fix 缺省；机器私有数据路径报 config set 提示）。
+import { existsSync, statfsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { loadSystem, channelRegistry, loadTarget } from '../../lib/config.mjs';
+import { join } from 'node:path';
+import { ROOT, loadSystem, channelRegistry, loadTarget, pickChrome } from '../../lib/config.mjs';
+import { saveJson } from '../../lib/config-write.mjs';
+import { computeSystemRepairs } from '../../lib/sysrepair.mjs';
 import { loadState, ledgerExists } from '../../lib/state.mjs';
 import { probeChromePort } from '../../lib/session.mjs';
 import { log, out } from '../../lib/log.mjs';
@@ -9,7 +13,32 @@ import { log, out } from '../../lib/log.mjs';
 function freeGB(p) { try { const s = statfsSync(p); return (s.bavail * s.bsize) / 1e9; } catch (e) { return null; } }
 function pickFfmpeg(cands) { for (const f of cands || []) { try { execFileSync(f, ['-version'], { stdio: 'ignore' }); return f; } catch (e) {} } return null; }
 
+// --fix：读原始 system.json（不过 loadSystem，故坏档/缺 md5fix 也能修）→ 计算修补 → 原子写 + .bak。返回是否动过盘。
+function doFix() {
+  const p = join(ROOT, 'system.json');
+  let raw;
+  try { raw = JSON.parse(readFileSync(p, 'utf8')); }
+  catch (e) { log.err(`--fix: 读取/解析 ${p} 失败：${e.message}（system.json 本体损坏，需手工修）`); return false; }
+  const { patch, fixed, unfixable } = computeSystemRepairs(raw, {
+    exists: existsSync,
+    detectChrome: () => pickChrome(),
+    detectFfmpeg: (cands) => pickFfmpeg([...(cands || []), 'ffmpeg']),
+  });
+  if (fixed.length) {
+    saveJson(p, { ...raw, ...patch }); // patch 各顶层键已是合并后完整子对象 → 浅合并即可
+    log.ok('--fix 已修补 system.json（旧值已备份 .bak）：');
+    fixed.forEach((f) => log.info('   ✓ ' + f));
+  } else log.ok('--fix：无可自动修补项');
+  if (unfixable.length) {
+    log.warn('以下为机器私有路径，不自动猜——请按提示手动确认：');
+    unfixable.forEach((u) => { log.warn(`   ✗ ${u.key}：${u.why}`); log.diag(u.hint); });
+  }
+  return fixed.length > 0;
+}
+
 export async function runDoctor({ flags }) {
+  if (flags.fix) doFix(); // 先修补，再走下面的只读体检看修补后实况
+
   const checks = [];
   const ok = (name, pass, note) => { checks.push({ name, pass, note }); log.info(`${pass ? '✓' : '✗'} ${name}: ${note}`); };
 

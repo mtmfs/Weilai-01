@@ -48,7 +48,7 @@ const COMMANDS = {
   passrate:         { group: '看', run: runPassrate,      channel: 'free', danger: 'read',     help: '过审率 + 审核时延 + 建议提交时段' },
   monitor:          { group: '看', run: runMonitor,       channel: 'free', danger: 'read',     help: '旁路被动录制网络请求到文件' },
   scan:             { group: '看', run: runScan,          channel: 'none', danger: 'read',     help: '扫各通道调试 Chrome 在不在跑 + 是否本号', aliases: ['ps'] },
-  doctor:           { group: '看', run: runDoctor,        channel: 'none', danger: 'read',     help: '环境自检：磁盘/ffmpeg/chrome/端口/台账/通道', aliases: ['preflight'] },
+  doctor:           { group: '看', run: runDoctor,        channel: 'none', danger: 'read',     help: '环境自检：磁盘/ffmpeg/chrome/端口/台账/通道（--fix 探测修补 system.json）', aliases: ['preflight'] },
   // ── 会话（浏览器）──
   ready:            { group: '会话', run: runReady,       channel: 'free', danger: 'browser',  help: '收敛到上传就绪（可自启 Chrome）' },
   open:             { group: '会话', run: runOpen,        channel: 'free', danger: 'browser',  help: '只启动 Chrome 实例、不收敛（ready 挂了的逃生口）' },
