@@ -1,98 +1,224 @@
 ---
 name: weilai
-description: 驱动 Weilai-01 CLI 跑千川双通道过审流水线（jie3 海投筛过审 → jie6 投放）。当用户要做这套业务的运营动作——看状态/确保就绪/同步审核/删过审腾槽/改MD5/准备一轮/关浏览器——时用本技能。封装命令选择、安全默认(delete 默认 dry-run)、铁律(绝不杀 chrome)、诚实边界与已知坑恢复。CLI 在 I:\weilai-01。
+description: 驱动 Weilai-01 CLI 跑千川双通道过审流水线（free 免费号海投筛过审 → paid 付费号投放）。当用户要做这套业务的运营动作——看状态/体检/查件/确保就绪/同步审核/删过审腾槽/改MD5/准备一轮/跑飞轮/关浏览器/登录配置/换机器修配置——时用本技能。封装命令选择、安全默认（delete/clear-local 默认 dry-run）、铁律（绝不杀 chrome）、主管级隔离（paid 烧钱通道需解锁）、诚实边界与已知坑恢复。CLI 在 I:\weilai-01。
 ---
 
-# Weilai-01 —— 千川双通道过审流水线 CLI 操作技能
+# Weilai-01 — 千川双通道过审流水线 CLI
+
+用调试版 Chrome（走 CDP）自动跑「千川双通道过审流水线」的命令行工具。
 
 操作者是业务主管（不写代码），维护是 AI。这个技能让我照规矩、安全地替他驱动 CLI。
 
-**业务**：捷沅3(`jie3`，免费测试号·推商品) 批量传视频筛"审核通过" → 捷沅6(`jie6`，真金~49万·推直播间·投放中) 把过审件搬过去真投放。机器真源是本地双通道台账。
+---
 
-**开工前**：要掌握最新现状，先读 `I:\weilai-01\docs\工程总报告.md`（项目唯一权威总览）——代码在演进，以本仓库实况/源码为准，别只依赖本技能的快照。旧日报已归档于 `docs/archive/`。
+## 目录
+
+1. [这套 CLI 是做什么的](#这套-cli-是做什么的)
+2. [怎么跑命令](#怎么跑命令)
+3. [安全约定（铁律·必须遵守）](#安全约定铁律必须遵守)
+4. [命令参考](#命令参考)
+5. [运营任务 → 命令](#运营任务--命令)
+6. [免费 vs 付费（主管级闸门）](#免费-vs-付费主管级闸门)
+7. [当前能做 / 不能做](#当前能做--不能做)
+8. [常见问题与排错](#常见问题与排错)
+9. [退出码对照](#退出码对照)
+10. [决策原则](#决策原则)
 
 ---
 
-## ⛔ 铁律（每次都守，不可破）
+## 这套 CLI 是做什么的
 
-1. **绝不杀 chrome**：禁止 `Stop-Process -Name chrome` / `taskkill /IM chrome.exe`。那会杀光用户**正常浏览器**，且强杀产生 Crashpad 崩溃转储填满 C 盘。要重置调试实例**只用 `weilai close <target>`**（CDP 优雅关、保登录、零转储）。
-2. **破坏性默认 dry-run**：`delete` 不加 `--apply` 只打印将删清单。**真删前必须**：先 dry-run 给用户看清单 → 用户确认 → 才 `--apply`。
-3. **jie6 = 有钱账户**（投放中~49万）：任何 jie6 动作先确认再做；优先只读。本程实验扰动过 jie6 会话，更要谨慎。
-4. **上传是真写平台**：`upload`/`test-round`/不带 `--skip-upload` 的 `cycle` 会**真上传到平台、烧审核额度**——确认再跑。`hold-submit` 仍是桩（抛 `E_NOT_IMPL`，待延迟挂起 TTL 探针）。
-5. **不确定就问，别瞎试**：尤其碰浏览器、碰 jie6、碰删除时。
+把视频素材在**免费测试号**刷过审，再搬到**付费投放号**真投放，省审核额度、控风险。
+
+| 通道 | 标签 | 账户 | 角色 | 花钱 | 端口 |
+|------|------|------|------|------|------|
+| 测试端 | `free` | 捷沅3（jie3·推商品） | 海投筛「审核通过」 | ❌ 免费 | 24601 |
+| 投放端 | `paid` | 捷沅6（jie6·推直播间·投放中~49万） | 把过审件搬来真投放 | ✅ 真金 | 24602 |
+
+**流程**：本地视频 →（传 free 跑过审）→ 过审则封存 →（搬到 paid 投放）→ paid 也过审则交付。被拒的改 MD5 重传，传满仍败则作废。
+
+**机器真源** = 本地双通道台账 `_video_state.json`（在 `H:\DD\6-18-魏-指纹\`）。命令面用 `free`/`paid` 标签，台账内部键仍是 `jie3`/`jie6`。
+
+> **开工前**：先 `doctor` 体检环境，再读 `I:\weilai-01\docs\工程总报告.md`（唯一权威总览，含现状 / 架构 / 已知 bug）。一切以仓库实况为准。
 
 ---
 
 ## 怎么跑命令
 
 用 Bash 工具跑：
+
+```bash
+node /i/weilai-01/bin/weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as <id>]
 ```
-node /i/weilai-01/bin/weilai.mjs <命令> <jie3|jie6> [--json] [--apply] [--skip-upload]
-```
-- 默认人看输出（中文日志走 stderr）；加 `--json` 出机器结构化输出（取字段时用）。
-- argv 只传 ASCII，**绝不传中文参数**（CLI 会拒）。
-- 退出码 0=成功；非 0 见末尾对照。
+
+- 默认人看输出（中文日志走 stderr）；加 `--json` 出机器结构化输出（stdout 只有 JSON）。
+- 退出码 `0`=成功，非 0 见[退出码对照](#退出码对照)。`--help` 看分组命令；`--help-all` 含主管级/桩/别名。
+- **长跑（`run` 飞轮）让用户在自己终端跑**：`! node /i/weilai-01/bin/weilai.mjs run`，`!` 前缀在用户会话里跑、免 AI 后台时限。
+- **交互式命令（`login`）让用户终端自跑**：AI 驱动会卡在 prompt。
 
 ---
 
-## 命令速查 + 何时用
+## 安全约定（铁律·必须遵守）
 
-| 命令 | 作用 | 何时用 | 破坏性 |
-|---|---|---|---|
-| `status [jie3\|jie6\|both]` | 只读台账分阶段汇总 | "看状态/进度" | 无 |
-| `ready <t>` | session 收敛到就绪（可自启动） | 碰浏览器前先确保就绪；"打开/准备" | 无(只读+导航) |
-| `sync <t>` | 拉平台审核归台账+派生清单 | "同步审核情况/看过了没" | 写台账，不动平台 |
-| `delete <t> [--apply]` | 删过审+被拒副本腾槽 | "删掉腾位置" | ⚠️ --apply 才删 |
-| `md5fix [t]` | 对待传/重传清单改 MD5 | "改MD5/防去重" | 仅写输出目录 |
-| `prep <t> [--apply]` | sync→delete→md5fix | "准备一轮（不含上传）" | delete 段同上 |
-| `upload <t>` | inject→submit→bump（真上传） | "上传这批" | ⚠️ 真写平台·烧额度 |
-| `cycle <t> [--rounds N] [--apply]` | 多轮收敛 ready→{sync→delete→md5fix→upload}×N（`--skip-upload` 可跳上传） | "跑一整轮/多轮迭代" | delete+upload 真写 |
-| `monitor <t>` | 旁路遥测录制（常驻不干扰） | "记录/统计用" | 无 |
-| `stats <t>` | 读录制出分时段报表 | "出统计" | 无 |
-| `close <t>` | 优雅关该实例调试 Chrome | 重置浏览器（替代杀进程） | 无(保登录) |
+1. **绝不杀 chrome**：禁止 `Stop-Process -Name chrome` / `taskkill /IM chrome.exe`——那会杀光用户正常浏览器，且强杀产生 Crashpad 崩溃转储填满 C 盘。重置调试实例**只用 `weilai close`**（free）/ `weilai close --as jie6`（paid·需解锁）。
+2. **破坏性操作默认 dry-run**：`delete` / `clear-local` 不加 `--apply` 只打印将做清单。**真删前必须**：先 dry-run 给用户看 → 用户确认 → 才 `--apply`。
+3. **paid = 烧钱账户**（投放中~49万）：主管级、默认锁定。任何 paid 动作先确认、优先只读；**绝不擅自设 `WEILAI_SUPERVISOR=1` 跑 paid**，必须用户明确要求。
+4. **命令行只用 ASCII**：中文（账户名/计划）写进 `channels/*.json` 或走 `login`，命令行只传 `jie3`/`jie6`。**例外**：`inspect <名字>` 的搜索词可中文（只读台账，不碰平台）。
+5. **不确定就问，别瞎试**：尤其碰浏览器、碰 paid、碰删除时。
 
 ---
 
-## 运营任务 → 命令映射
+## 命令参考
 
-- **"看状态/到哪了"** → `status both`（先 sync 再 status 能拿最新平台真相）。
-- **"确保就绪 / 打开 jie3"** → `ready jie3`。
-- **"同步一下审核过了没"** → `sync jie3`（会更新台账 + 出待重传/待传清单）。
-- **"删掉过审的腾位置"** → 先 `delete jie3`（dry-run 看清单）→ 给用户看 → 确认后 `delete jie3 --apply`。
-- **"改 MD5"** → `md5fix jie3`（读台账派生清单；磁盘注意：每个~400MB）。
-- **"准备/跑一轮"** → `prep jie3`（不含上传）或 `cycle jie3 --rounds N`（含真上传·多轮迭代）。
-- **"关掉浏览器"** → `close jie3`（绝不杀进程）。
+> 裸命令默认 **free**（免费测试号，安全）。付费命令为主管级，见[免费 vs 付费](#免费-vs-付费主管级闸门)。
+
+### 看 / 体检（只读）
+
+| 命令 | 别名 | 作用 |
+|------|------|------|
+| `doctor [--fix]` | preflight | 环境自检：磁盘/ffmpeg/chrome/端口/台账/通道。`--fix` 探测修补 system.json（写本地 +.bak） |
+| `status [both\|free\|paid]` | st | 台账分阶段/分通道汇总 |
+| `inspect <名字片段>` | show, find | 查名字含某串的视频在台账状态（搜索词可中文） |
+| `scan` | ps | 扫各通道调试 Chrome 在不在跑 + 是否本号 |
+| `whoami` | — | 探当前登录账户（config 的 account 为空则回填） |
+| `monitor` / `monitor-report` | stats, traffic | 旁路录制网络请求 / 读录制出分时段报表 |
+| `passrate` | — | 分时段过审率 + 建议提交时段 |
+
+### 会话 / 浏览器
+
+| 命令 | 作用 |
+|------|------|
+| `open` | 只启动 Chrome 实例、不收敛（`ready` 挂了的逃生口） |
+| `ready` | session 收敛到上传就绪（可自启 Chrome）。碰浏览器前先确保就绪 |
+| `close` | 优雅关该通道调试 Chrome（CDP 优雅关、保登录、零转储） |
+| `login` | 交互式录入端口/凭据/双通道标识（让用户终端自跑 `! node …login`） |
+
+### 流水线 / 编排
+
+| 命令 | 别名 | 作用 | 破坏性 |
+|------|------|------|--------|
+| `sync` | — | 拉平台审核归台账 | 写台账 |
+| `delete [--apply]` | — | 删过审 + 被拒副本腾槽 | ⚠️ `--apply` 才删 |
+| `md5fix` | — | 对待传/重传清单改 MD5（绕去重·纯本地） | 写 I:\ |
+| `upload` | — | 真上传（注入 → 提交 → 记账） | ⚠️ 真写平台 |
+| `reconcile [--apply]` | — | 对账 un-bump 幻影上传 | ⚠️ `--apply` 才改台账 |
+| `prep [--apply]` | — | sync→delete→md5fix（备料不传） | delete 段同上 |
+| `cycle [--rounds N] [--apply]` | test-round | 免费多轮收敛（轮间不死等） | ⚠️ 含真上传 |
+| `run` | flywheel | **免费飞轮**（异步连续·日常主力） | ⚠️ 含真上传 |
+| `clear-local [--apply]` | — | 清本地源 + md5fix 孤儿副本 | ⚠️ `--apply` 才删 |
+| `config get/set ...` | — | 读/改配置旋钮（set 默认 dry-run，`--apply` 落盘） | 写本地 |
+
+### 主管级（需 `WEILAI_SUPERVISOR=1` 解锁）
+
+| 命令 | 别名 | 作用 | 状态 |
+|------|------|------|------|
+| `run-paid` / `run-both` | — | 付费 / free+paid 双通道飞轮 | ✅ ⚠️💰 真烧钱 |
+| `cycle-paid` | deliver-round | 付费多轮 | ✅ ⚠️💰 |
+| `delete-paid` | sweep | 付费腾槽 | ❌ 未实现（桩） |
 
 ---
 
-## 当前能做 / 不能做（诚实边界·权威现状见 `docs/工程总报告.md` §0 能力矩阵）
+## 运营任务 → 命令
 
-**能用**（前提：对应通道 profile 保持登录态）：
-- jie3 全流程：`status`/`ready`/`sync`/`delete`/`md5fix`/`prep`/`upload`/`test-round`/`cycle`/`monitor`/`stats`/`passrate`/`close`——含**真上传**（已 live 创建素材）。覆盖「海投筛过审」整段。
-- jie6 投放：`ready`/`upload` 经 lib 跑通过（**仅在暖 profile 登录有效时**，已真投放过审件）；但 `deliver-round` 命令封装未端到端验证、jie6 `delete` 未实现（见下「还不能」）。
-
-**还不能 / 未通**：
-- **jie6 冷 profile 登录链**（登出后自动登录未通；现靠暖 profile 绕过）。
-- **hold-submit**（桩，待延迟挂起 TTL 探针）。
-- **双实例同时并行**（#5 / S2 飞轮，未真并行）。
-- **jie6 delete/sweep**（creative-tab 删除待补预抓签名重放）。
+- **"环境/出问题了 / 换机器"** → `doctor`（开工先体检）；换机器加 `doctor --fix` 自动修配置。
+- **"看状态/到哪了"** → 先 `sync` 再 `status`（拿最新平台真相）。
+- **"查某人/某件"** → `inspect 张晟钰`。
+- **"浏览器开着没"** → `scan`；**"现在登的哪号"** → `whoami`。
+- **"确保就绪 / 打开"** → `ready`（收敛挂了用 `open` 手动开）。
+- **"同步审核过了没"** → `sync`。
+- **"删掉过审的腾位置"** → `delete`（dry-run 看清单）→ 给用户看 → 确认后 `delete --apply`。
+- **"改 MD5"** → `md5fix`（每件约 400MB，注意磁盘）。
+- **"持续跑 / 挂着自动跑"** → `run`（免费飞轮，日常主力；长跑让用户 `! node …run` 自跑）。
+- **"关掉浏览器"** → `close`（绝不杀进程）。
+- **"配置 / 换号"** → 让用户终端自跑 `! node …login`（交互式）。
+- **付费投放**（谨慎·主管级）→ 用户明确要求才 `WEILAI_SUPERVISOR=1` + `run-paid` / `run-both`。
 
 ---
 
-## 已知坑 + 恢复
+## 免费 vs 付费（主管级闸门）
 
-- **`ready` 失败 E_DRIFT/E_SIG（账户=?）**：多半是 session 冷/被弹。先 `close <t>` 再重跑 `ready`（带 3 次重试）。jie3 的 advId 已修，冷会话现也能收敛。
-- **jie3 卡在登录（始终 E_DRIFT）**：说明那个 profile **登出了**——当前登录探测在登出 profile 上不触发 login（已知 bug）。处理：请用户用 `! ` 在 9222 手动登录母账号一次，再重跑 `ready`；或等登录链修好。
-- **`delete` 报"将删 0"**：可能正常（被拒/过审副本历史轮次已删过），但**此结果尚存疑、未核实**。若用户说"明明还有该删的"，需拉平台数据交叉核对，别当然认为是对的。
-- **磁盘**：`md5fix` 全量 97 件≈40GB；分批跑、批间清输出目录。台账盘 H:、输出盘 I: 要有空间。
-- **退出码**：0 OK / 10 E_DRIFT(账户漂移) / 11 E_LOGIN / 12 E_SIG(会话冷) / 13 E_ROI / 14 E_SELECTOR(选择器漂移·需我修) / 16 E_FREEZE_SKIP(非致命) / 20 E_CONFIG / 64 E_NOT_IMPL(上传桩) / 2 E_USAGE(传了中文)。
+裸命令默认走 **free**（免费测试号 jie3），日常主力、安全。碰 **paid**（烧钱号 jie6）的命令是主管级、默认锁定：
+
+- `run-paid` / `run-both` / `cycle-paid` / `delete-paid`，或任意命令加 `--as jie6`；
+- 都需先设环境变量解锁：PowerShell `$env:WEILAI_SUPERVISOR=1`；
+- **绝不擅自解锁**，必须用户明确要投放。
+
+`free`/`paid` 只是命令面标签，台账内部键仍是 `jie3`/`jie6`。
+
+---
+
+## 当前能做 / 不能做
+
+**能稳定用**（前提：free 的 profile 保持登录态）：
+
+- free 测试通道**非上传 + 上传**全流水线：`doctor`/`status`/`inspect`/`scan`/`whoami`/`open`/`ready`/`sync`/`delete --dry`/`md5fix`/`upload`/`cycle`/`run`/`clear-local`/`close`/`monitor`/`passrate`。
+- `run`（免费飞轮）是日常主力：跨 tick 不死等、md5fix 并行、自适应退避。
+
+**还不能用 / 半残**：
+
+- **paid 半条腿**：能传不能删（`delete-paid` 是桩）、冷 profile 登录链有 bug（靠暖 profile）。`run-paid`/`run-both` 机制打通但长时无人值守未验证。
+- `hold-submit`（择时挂起提交）= 桩。
+- `login` 的账户名靠登录后探测读回（尽力而为）；冷登录失败时配置仍保存，提示手动登录后 `whoami` 回填。
+
+---
+
+## 常见问题与排错
+
+#### Q1：`ready` 失败，报 E_DRIFT / E_SIG
+
+**原因**：多半 session 冷 / 被弹。
+
+**解决**：先 `close` 再重跑 `ready`（带 3 次重试）。若 profile 已登出 → 当前冷登录探测有 bug，请用户手动登录母账号一次再重跑。
+
+#### Q2：`run --jie6` / 任何 paid 命令被拒
+
+**原因**：正常——付费号是主管级。
+
+**解决**：用户明确要投放时，设 `WEILAI_SUPERVISOR=1` 解锁；否则用 `run`（仅免费）。
+
+#### Q3：`delete` 报"将删 0"
+
+**原因**：可能正常（历史轮次已删过，平台无 live 副本可删）。
+
+**解决**：此结果尚存疑——用户说"明明还有"时，拉平台交叉核对。
+
+#### Q4：换机器 / 换盘符后跑不起来
+
+**原因**：`system.json` 里的绝对路径（flatRoot / 台账 / chrome / ffmpeg / md5fix 输出）指向旧机器。
+
+**解决**：跑 `doctor --fix`——自动探测回填 chrome/ffmpeg、补 md5fix 缺省；机器私有数据路径它不猜，会打印精确的 `config set system <key> "X:\..." --apply` 让你逐条改。改完再 `doctor` 复检全 ✓。注意 Chrome 调试 profile 的登录态绑在原盘，换机要重新 `ready` 登录（冷登录有 bug，见 Q1）。
+
+#### Q5：长跑（飞轮）停了，想知道为什么
+
+**解决**：`run`/`run-paid`/`run-both` 默认把带时间戳的运行日志落 `I:\weilai-01\logs\run-<日期>.log`（控制台照常）。飞轮停了 / 熔断 / 挂了，去这里翻原因。`WEILAI_LOG_FILE` 环境变量可改路径。
+
+#### Q6：磁盘 / 端口
+
+- **磁盘**：`md5fix` 全量约 40GB，分批跑、批间 `clear-local --apply` 清孤儿。台账盘 H:、输出盘 I: 要有空间，`doctor` 会报余量。
+- **端口**：free=24601 / paid=24602（`login` 可改）。`scan` 报端口占用 / 陌生 Chrome。
+
+---
+
+## 退出码对照
+
+| 码 | 名 | 含义 |
+|----|----|------|
+| 0 | OK | 成功 |
+| 2 | E_USAGE | 用法错（传了中文 / 主管未解锁） |
+| 10 | E_DRIFT | 账户/计划漂移 |
+| 11 | E_LOGIN | 掉登录 |
+| 12 | E_SIG | 会话冷 / 签名失效 |
+| 14 | E_SELECTOR | 选择器漂移（需人修） |
+| 16 | E_FREEZE_SKIP | 上传冻结跳过（非致命） |
+| 20 | E_CONFIG | 配置/环境错（如 jie6 delete 未实现、缺 md5fix） |
+| 64 | E_NOT_IMPL | 未实现（如 hold-submit） |
 
 ---
 
 ## 决策原则
 
-1. **jie3 优先**：jie3 能正常用是硬目标；jie6 后推（除非用户明确要）。
-2. **破坏性先 dry-run + 问**：delete/--apply、任何 jie6 写操作，先看清单、先确认。
-3. **碰浏览器先 `ready`**：sync/delete 前确保就绪。
-4. **报告如实**：失败就贴退出码+日志；没验证过的别说"成功"；不确定标"存疑"。
-5. **深挖看文档**：`docs/工程总报告.md`(权威总览：现状/架构/数据模型/已知bug/路线) / `docs/PLAN.md`(设计底稿)。更细的架构/运维/退出码已并入总报告，历史参考在 `docs/archive/`。
+1. **free 优先**：free 日常用是硬目标；paid 后推（除非用户明确要、且主管解锁）。
+2. **破坏性先 dry-run + 问**：delete/clear-local 的 `--apply`、任何 paid 写操作，先看清单、先确认。
+3. **碰浏览器先 `doctor`/`ready`**：sync/delete/upload 前确保环境 + 就绪。
+4. **报告如实**：失败就贴退出码 + 日志；没验证过的别说"成功"；不确定标"存疑"。
+5. **深挖看文档**：`docs/工程总报告.md`（唯一权威总览·现状/架构/已知bug/路线）。
