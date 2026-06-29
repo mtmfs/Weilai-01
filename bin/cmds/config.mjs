@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, loadTarget, REQUIRED_TARGET, labelToId } from '../../lib/config.mjs';
 import { saveJson, getByPath, setByPath, coerceScalar } from '../../lib/config-write.mjs';
-import { log, out } from '../../lib/log.mjs';
+import { log, out, writeText } from '../../lib/log.mjs';
 
 const SENSITIVE = new Set(['aavid', 'planId', 'funded', 'maxUploads']); // 驱动有钱号真实投放/支出
 
@@ -39,7 +39,7 @@ function doGet({ id, key, json }) {
   const val = getByPath(obj, key);
   if (val === undefined) cfgErr(`键不存在：${id}.${key}`);
   if (json) { out({ command: 'config', action: 'get', target: id, key, value: val }); return; }
-  process.stdout.write((typeof val === 'object' ? JSON.stringify(val) : String(val)) + '\n'); // 裸值 → 可脚本化
+  writeText(typeof val === 'object' ? JSON.stringify(val) : String(val)); // 裸值 → 可脚本化
 }
 
 function doSet({ id, key, rawValue, apply, json }) {
@@ -61,7 +61,7 @@ function doSet({ id, key, rawValue, apply, json }) {
   const sensitive = acctRisk || moneyRisk;
   log.step(`config set ${id}.${key}: ${JSON.stringify(oldVal)} → ${JSON.stringify(newVal)}${apply ? '' : '（dry-run·未写）'}`);
   if (acctRisk) log.warn(`${id}.${topField} 是账户/计划标识，误改会把操作指向错账户/计划——核对后再 --apply。`);
-  if (moneyRisk) log.warn(`${id} 是有钱投放号(funded)，改 ${topField} 影响真实投放/支出——核对后再 --apply。`);
+  if (moneyRisk) log.warn(`${id} 是付费投放通道(funded)，改 ${topField} 影响真实投放/支出——核对后再 --apply。`);
   if (!apply) {
     log.info('加 --apply 才真写（原子写 + .bak 备份旧值）。');
     if (json) out({ command: 'config', action: 'set', target: id, key, old: oldVal ?? null, new: newVal, applied: false, sensitive });

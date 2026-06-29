@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Weilai-01 CLI 入口：解析 argv、护栏、分发子命令。
 // 护栏：拒绝非 ASCII argv（中文走 channels/*.json 或 login 读回，绝不走命令行）→ exit 2 (E_USAGE)。
-// 通道模型：裸命令默认 free(免费测试号)；`-paid` 后缀 / `--as <id>` 选 paid(付费投放号·主管级·烧钱)。
+// 通道模型：裸命令默认 free(免费测试号)；`-paid` 后缀 / `--as <id>` 选 paid(付费投放号·主管级)。
 //   free/paid 是命令层标签 → channelRegistry 的 testId/delivId；台账内部键仍是 jie3/jie6。
 import { runStatus } from './cmds/status.mjs';
 import { runConfigCmd } from './cmds/config.mjs';
@@ -28,6 +28,7 @@ import { runLogin } from './cmds/login.mjs';
 import { channelRegistry, labelToId } from '../lib/config.mjs';
 import { supervisorUnlocked } from '../lib/tier.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
+import { out, writeText, writeErr } from '../lib/log.mjs';
 
 const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 const DANGER = { read: '🟢只读', local: '🔵写本地', browser: '🟡浏览器', ledger: '🔵写台账', platform: '🔴写平台' };
@@ -147,7 +148,7 @@ function usage(showAll = false) {
     'Weilai-01 — 千川双通道过审流水线 CLI',
     '',
     '用法: weilai <命令> [--json] [--dry-run|--apply] [--as <id>]',
-    '通道: 裸命令默认 free(免费测试号)；-paid 后缀 / --as 选 paid(付费投放号·主管级·烧钱)',
+    '通道: 裸命令默认 free(免费测试号)；-paid 后缀 / --as 选 paid(付费投放号·主管级)',
     '',
   ];
   for (const g of ['看', '会话', '流水线', '编排', '维护', '主管', '桩']) {
@@ -170,10 +171,10 @@ function usage(showAll = false) {
 function exitWithError(e) {
   const code = e && e.code;
   if (code && CODE_TO_EXIT[code] !== undefined) {
-    console.error(`[${code}] ${e.message}`);
+    writeErr(`[${code}] ${e.message}`);
     process.exit(CODE_TO_EXIT[code]);
   }
-  console.error(`[ERROR] ${(e && e.stack) || e}`);
+  writeErr(`[ERROR] ${(e && e.stack) || e}`);
   process.exit(EXIT.RUNTIME);
 }
 
@@ -193,18 +194,18 @@ async function main() {
   const allowCN = cmd === 'inspect';
   const bad = argv.find((a) => /[^\x00-\x7F]/.test(a) && !(allowCN && !a.startsWith('-')));
   if (bad) {
-    console.error(`[E_USAGE] 命令行参数含非 ASCII 字符：「${bad}」。中文写进 channels/*.json 或用 login，命令行只用 ASCII。`);
+    writeErr(`[E_USAGE] 命令行参数含非 ASCII 字符：「${bad}」。中文写进 channels/*.json 或用 login，命令行只用 ASCII。`);
     process.exit(EXIT.USAGE);
   }
 
   if (!cmd || flags.help) {
-    console.log(usage(!!flags.helpAll));
+    writeText(usage(!!flags.helpAll));
     process.exit(EXIT.OK);
   }
 
   const entry = COMMANDS[cmd];
   if (!entry) {
-    console.error(`未知命令：${pos[0]}\n\n${usage()}`);
+    writeErr(`未知命令：${pos[0]}\n\n${usage()}`);
     process.exit(EXIT.USAGE);
   }
 
@@ -213,14 +214,14 @@ async function main() {
     const needsResolve = entry.channel !== 'raw' && entry.channel !== 'none';
     const targets = needsResolve ? resolveTargets(entry, flags) : { ids: [], touchesPaid: false };
     if ((entry.tier === 'super' || targets.touchesPaid) && !supervisorUnlocked()) {
-      console.error(`[E_USAGE] \`${cmd}\` 是主管级（付费/烧钱通道）命令，默认锁定。\n解锁：设环境变量 WEILAI_SUPERVISOR=1 后重试（PowerShell: $env:WEILAI_SUPERVISOR=1）。`);
+      writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n解锁：设环境变量 WEILAI_SUPERVISOR=1 后重试（PowerShell: $env:WEILAI_SUPERVISOR=1）。`);
       process.exit(EXIT.USAGE);
     }
 
     // 桩占位。
     if (entry.impl === false || !entry.run) {
-      if (flags.json) console.log(JSON.stringify({ command: cmd, implemented: false, note: entry.help }));
-      else console.log(`命令 \`${cmd}\` 尚未实现（桩）。说明：${entry.help}`);
+      if (flags.json) out({ command: cmd, implemented: false, note: entry.help });
+      else writeText(`命令 \`${cmd}\` 尚未实现（桩）。说明：${entry.help}`);
       process.exit(CODE_TO_EXIT.E_NOT_IMPL);
     }
 

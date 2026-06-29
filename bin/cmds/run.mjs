@@ -34,7 +34,7 @@ export async function runRun({ flags, channels: bound }) {
   if (!channels.length) { const e = new Error(`用法: weilai run [--<通道>|--no-<通道>]（通道: ${ids.join('|')}）`); e.code = 'E_USAGE'; throw e; }
   // 主管闸：含付费号须解锁（覆盖 legacy --jie6 / --as paid 等到 paid 的路径）。
   if (channels.includes(reg.delivId) && !supervisorUnlocked()) {
-    const e = new Error(`飞轮含付费号 ${reg.delivId}（主管级·烧钱），默认锁定：设 WEILAI_SUPERVISOR=1 解锁，或用 \`run\`（仅免费）。`); e.code = 'E_USAGE'; throw e;
+    const e = new Error(`飞轮含付费号 ${reg.delivId}（主管级·付费投放），默认锁定：设 WEILAI_SUPERVISOR=1 解锁，或用 \`run\`（仅免费）。`); e.code = 'E_USAGE'; throw e;
   }
 
   // CLI 覆盖（其余取 system.json.daemon / flywheel.DAEMON_DEFAULTS）。

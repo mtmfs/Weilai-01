@@ -123,7 +123,7 @@ async function interactive(map) {
     const fa = await ask(rl, 'free 通道 aavid', cur.free.aavid || '');
     const fpl = await ask(rl, 'free 通道 planId', cur.free.planId || '');
     const fm = await ask(rl, 'free 通道 最大上传', cur.free.maxUploads || DEF_MAX.free);
-    log.info('— 以下为 paid(付费·烧钱)通道；不配可直接回车跳过 —');
+    log.info('— 以下为 paid(付费投放)通道；不配可直接回车跳过 —');
     const pa = await ask(rl, '*paid 通道 aavid', cur.paid.aavid || '');
     const ppl = await ask(rl, '*paid 通道 planId', cur.paid.planId || '');
     const pm = await ask(rl, '*paid 通道 最大上传', cur.paid.maxUploads || DEF_MAX.paid);

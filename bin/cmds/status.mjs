@@ -1,6 +1,7 @@
 // status：只读。载入配置 + 台账，输出分阶段/分通道汇总。Phase 0 不碰 Chrome。
 import { loadSystem, loadTarget, discoverChannelIds, labelToId } from '../../lib/config.mjs';
 import { loadState, summarize, ledgerExists } from '../../lib/state.mjs';
+import { out, writeText } from '../../lib/log.mjs';
 
 export async function runStatus({ flags, pos }) {
   const sys = loadSystem();
@@ -37,16 +38,16 @@ export async function runStatus({ flags, pos }) {
   };
 
   if (flags.json) {
-    console.log(JSON.stringify(report, null, 2));
+    out(report);
     return;
   }
 
-  console.log(`项目: ${report.project}`);
-  console.log(`台账: ${report.ledgerPath}${report.ledgerExists ? '' : '  （不存在）'}`);
-  console.log(`视频总数: ${report.totalVideos}`);
-  console.log('分阶段: ' + Object.entries(report.stages).map(([k, v]) => `${k}=${v}`).join(' / '));
+  writeText(`项目: ${report.project}`);
+  writeText(`台账: ${report.ledgerPath}${report.ledgerExists ? '' : '  （不存在）'}`);
+  writeText(`视频总数: ${report.totalVideos}`);
+  writeText('分阶段: ' + Object.entries(report.stages).map(([k, v]) => `${k}=${v}`).join(' / '));
   for (const [id, c] of Object.entries(report.channels)) {
-    console.log(
+    writeText(
       `  [${id}] ${c.account}  aavid=${c.aavid}  mode=${c.mode}  plan=${c.planId}  port=${c.port}  maxUploads=${c.maxUploads}  | 过审=${c.passed} 作废=${c.scrapped}`
     );
   }
