@@ -1,6 +1,7 @@
 # Weilai-01 — 千川双通道过审流水线 CLI 重构方案 (v2)
 
 > 📐 **设计底稿（v2）。现状/进度以 [`docs/工程总报告.md`](工程总报告.md) 为准**；本文保留作设计理念与决策溯源（总报告 §5 决策日志引用它）。
+> 2026-06-29 注：本文中的 `ready jie3` / `upload jie3` 等裸通道参数是历史设计语法；当前 CLI 通道绑定命令用裸命令默认 `free`，或 `--as free|paid|<id>` / `upload-paid` / `run-paid` 等后缀命令。命名规则为“空格=普通参数；横杠=产品化入口/风险边界”：`status paid` 这类 raw 参数命令仍保持空格写法，`upload paid` 这类自由组合继续拒绝。运行期账户名探针也已退出护栏，当前身份断言是 `aavid + planId + session`。
 
 > 操作者：你（业务主管，不写代码）。维护者：我（AI）。
 > v2 已并入你的 11 条反馈 + 三轮代码探查的实测结论。本文件既是审批用 plan，也是批准后种进私库 `Weilai-01` 的设计底稿。
@@ -27,7 +28,7 @@
 
 ## 一、Context
 
-`I:\cdp-helper\` 是一套 CDP 驱动调试版 Chrome 的 Node(.mjs) 工具集,跑**双通道过审流水线**:捷沅3(免费·推商品·暂停)批量传视频筛"审核通过"→ 捷沅6(真金~49万·推直播间·投放)把过审件搬过去真投放。机器真源是本地 `_video_state.json` 双通道台账。
+`I:\cdp-helper\` 是一套 CDP 驱动调试版 Chrome 的 Node(.mjs) 工具集,跑**双通道过审流水线**:free 免费测试通道批量传视频筛"审核通过"→ paid 真实花钱通道把过审件搬过去真投放。机器真源是本地 `_video_state.json` 双通道台账。
 
 它**能跑、已闭环**,但形态停在"散脚本 + 人肉串联":138 个 `.mjs`(~70 个 probe 一次性件)、无统一入口、无配置层、重复逻辑遍地、硬编码钉死单一目标、冷启动脆弱、上传慢且会被单个龟速件拖死。本方案把它收敛成可被非程序员安全驱动、可被我低成本维护的 CLI。
 
@@ -42,7 +43,7 @@
 | 1 | skill 只列 5 份报告 | 实有第 6 份(`报告_双通道7x3跑_2026-06-23`),CLI 雏形+漂移根因+双实例都在里面 |
 | 2 | 账户漂移给的是"校验URL重nav"缓解法 | 根因＝两通道共享浏览器 session 被顶号;根治＝**两个独立 Chrome 实例(9222/9223 各自 profile)** |
 | 3 | "约定/护栏"段仍写旧单通道 `ever_passed`/`reject_count` | 与"双通道扩展"章自相矛盾(已被取代但旧文没删) |
-| 4 | 记"捷沅6 创意tab 没自动化·靠人工" | R6 已脚本化(点击稳定性待加固) |
+| 4 | 记"paid 创意tab 没自动化·靠人工" | R6 已脚本化(点击稳定性待加固) |
 | 5 | "固定参数写死脚本顶部" | PORT 散在 ~45 文件、ROOT 23、KW 20、aavid 25——换目标/双实例都得 grep-replace |
 | 6 | 脚本清单只列几十个 | 实际 138 个;**8 个模式被复制 3–18 次**(见 §十一);命令行有中文编码坑 |
 | 7 | "上传时记 materialId"被反复点名为最优解 | 一直没做(本方案纳入) |
@@ -87,7 +88,7 @@
 **纠正**：session 不是不可拆的叶子。它是一长串动作、且人可能停在任意页面启动。改成**最小拆分 + 最大聚合**的三层:
 
 ### 7 个只读探针（判断"我在哪一步",可单独调）
-`chrome-port`(9222 在听?) · `login-status`(母账号登了?) · `session-cookie`(`_x_ac_ts` 新鲜?) · `tab`(目标 aavid 标签在?) · `account`(当前标签哪个账户?) · `plan`(计划锁住?行数?) · `view`(素材抽屉/创意tab 开了?)
+`chrome-port`(端口在听?) · `login-status`(母账号登了?) · `session-cookie`(`_x_ac_ts` 新鲜?) · `tab`(目标 aavid 标签在?) · `plan`(计划锁住?行数?) · `view`(素材抽屉/创意tab 开了?)
 
 ### 8 个幂等动作（每个先探针、已达成就跳过,可单独调）
 `launch-chrome` · `login <email> <pwd>` · `sso-handshake <aavid>`(`agent/redirect/ad?advId=` 种会话+校验新鲜) · `ensure-tab <aavid>`(无则建并锁,**带重试**——修现状 10s 硬等无重试) · `set-mode <mode>` · `lock-plan <aavid> <plan>`(jie6 靠 `detail?adId=` URL 锁绕开 4 同名计划) · `open-view`(抽屉 or 创意tab) · `close-popup`
@@ -99,9 +100,9 @@
 |---|---|---|
 | 没 Chrome | port✗ | 全链 |
 | 没登录 | login✗ | login→handshake→…→open-view |
-| 对账户对计划抽屉关 | view✗ | 仅 open-view |
-| 错账户 | account≠期望 | ensure-tab→…(或停,防误删有钱账户) |
-| 对账户错计划 | plan 行=0 | lock-plan→open-view |
+| 对标签对计划抽屉关 | view✗ | 仅 open-view |
+| 错标签/错通道 | aavid 不在位 | ensure-tab→…(或停,防误操作有钱通道) |
+| 对标签错计划 | plan 行=0 | lock-plan→open-view |
 | 已就绪 | 全✓ | 空操作 |
 
 **最脆要加固的步**：SSO 握手(补 cookie 新鲜校验)、模式 tab 选择器漂移、jie6 四同名计划(URL 锁)、素材链接点击、建标签重试。现有 `qc-setup.mjs` 已把 jie3 串到 ~85%,缺的正是这些 + 统一调度器 + jie6 并入。
@@ -216,7 +217,7 @@
 | 检测 | 怎么测 | 动作 | 二次失败 |
 |---|---|---|---|
 | 弹窗遮罩 | 探 `tools-vmok-plugin-modal__close-icon` | 合成click关(黑名单破坏性叉) | 继续 |
-| **账户漂移** | 断言 URL aavid&plan & `QC_AAVID` 锁 | 重握手→重nav | 退 E_DRIFT |
+| **目标漂移** | 断言 URL aavid + plan + session | 重握手→重nav | 退 E_DRIFT |
 | 掉登录 | URL 含 `/login`/`from_qc_login=1` | login母账号→重握手→续跑 | 退 E_LOGIN |
 | 签名/SSO 过期 | `_x_ac_ts` 年龄/鉴权错 | 重触发已签名请求重抓 | 退 E_SIG |
 | ROI 锁置灰 | 探增删按钮 disabled+ROI>上限 | 提示降 ROI、拦破坏性 | 退 E_ROI |
@@ -329,7 +330,7 @@ weilai-01/
 - **上传接口桩**：声明 `upload()/submit()/bump()/hold-submit()` 签名与返回约定，内部 `E_NOT_IMPL`。
 
 **①通过标准（全绿才动②）**：
-1. 冷态 `weilai ready jie3` 自启动到就绪（杀 Chrome / 停任意页 都能收敛）。
+1. 冷态 `weilai ready`（free）或 `weilai ready --as paid` 自启动到就绪（杀 Chrome / 停任意页 都能收敛）。
 2. `guard` 自修复：人为造 漂移/弹窗/掉登录 → 自动恢复或正确 E_码停。
 3. `sync` / `delete --dry-run` / `md5fix` / `status` 全跑通；`monitor` 出分时段报表。
 4. `cycle --skip-upload` 空转完整骨架(轮调度+人控点+退出码)，到上传桩优雅停。
@@ -364,7 +365,7 @@ weilai-01/
 
 1. **只读自检** `weilai status --json` → doctor 全✓、台账与现状 97 件一致。
 2. **TTL 探针** Phase1:注入N挂不同时长试提交 → 出"能挂多久"安全窗口(延迟上传转正依据)。
-3. **dry-run** `weilai prep jie3 --dry-run` 打印清单不动平台 → 核对后 `--apply`。
+3. **dry-run** `weilai prep --dry-run` 打印清单不动平台 → 核对后 `--apply`。
 4. **逐文件超时验证** jie3 取含 1 个人为限速件的小批 → 跑 `test-round` → **已传完的不再陪等 5 分钟**(对比现状)。
 5. **韧性** 手动弹"AI修复"遮罩→guard 自动扫;手动导到 jie6→guard 报 E_DRIFT 而非误删。
 6. **遥测** 跑一轮 → `status` 出分时段上传/审核/过审率报表。

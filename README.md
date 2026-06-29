@@ -1,43 +1,338 @@
 # Weilai-01
 
-> ⚠️ **接手 / 下个 agent：先读 [`docs/工程总报告.md`](docs/工程总报告.md)** —— 项目唯一权威总览（现状 / 架构 / 数据模型 / 已知坑 / 路线）。旧日报已归档于 `docs/archive/`。
+千川双通道过审流水线 CLI：用 **free 免费测试通道**批量筛「审核通过」，再把过审素材交给 **paid 付费投放通道**真投放。
 
-千川双通道过审流水线 CLI。把 `I:\cdp-helper\` 的 138 个散脚本收敛成一个**配置驱动、可被非程序员安全驱动、可被维护者低成本演进**的 CLI。
+这个仓库目前是**内部本机工具**，不是已完成分发的产品。README 只写日常操作和维护入口；完整现状、架构、数据模型、已知问题以 [`docs/工程总报告.md`](docs/工程总报告.md) 为准。
 
-- **测试通道 free**（= jie3 · 捷沅3 · 推商品 · 免费）：批量传视频筛「审核通过」。
-- **投放通道 paid**（= jie6 · 捷沅6 · 推直播间 · 真金 · 投放中 · **主管级**）：把过审件搬过去真投放。
-- **机器真源** = 本地双通道台账 `_video_state.json`。
+---
+
+## 目录
+
+1. [项目定位](#项目定位)
+2. [当前状态](#当前状态)
+3. [命令模型](#命令模型)
+4. [日常操作](#日常操作)
+5. [命令清单](#命令清单)
+6. [配置与数据](#配置与数据)
+7. [安全边界](#安全边界)
+8. [开发与验证](#开发与验证)
+9. [项目结构](#项目结构)
+
+---
+
+## 项目定位
+
+Weilai-01 把「素材过审」拆成一组可重跑、可对账、可被 AI/非程序员安全驱动的 CLI 命令：
+
+1. **free 筛选**：把本地视频传到免费测试通道，批量筛出过审素材。
+2. **台账追踪**：用 `_video_state.json` 记录每个视频在每个通道的上传次数、审核状态、阶段。
+3. **MD5 重试**：被拒素材通过 ffmpeg 重封装改哈希，再重新上传。
+4. **paid 投放**：把 free 已过审素材推到付费投放通道。
+5. **旁路遥测**：录制上传/审核请求，统计时延、错误率、过审率。
+
+核心原则：**平台是真实副作用，本地台账是机器真源，命令必须有清楚的风险边界。**
+
+---
 
 ## 当前状态
-**双通道闭环已 live 跑通**（free 筛过审 → paid 真投放）。命令面 2026-06 重构：**裸命令默认 free**、付费 `paid` 通道主管级隔离（`WEILAI_SUPERVISOR=1` 解锁），旧名（test-round/deliver-round/stats/sweep…）全保留为别名。新增 `doctor/scan/whoami/open/inspect/login`。**paid 投放通道半残**（删除未实现、靠暖 profile 登录，见总报告 §6）。**现状以 `docs/工程总报告.md` 为准。**
 
-## 快速上手
-```bash
-node bin/weilai.mjs doctor            # 环境自检（开工先跑）
-node bin/weilai.mjs status            # 只读：台账分阶段/分通道汇总（默认 both）
-node bin/weilai.mjs status free       # 只看 free(=jie3)
-node bin/weilai.mjs --help            # 分组命令总览（--help-all 含主管级/别名）
+| 能力 | 状态 | 说明 |
+|------|------|------|
+| free 流水线 | 可日常用 | `ready` / `sync` / `delete` / `md5fix` / `upload` / `run` |
+| paid 上传 | 可用但谨慎 | `upload-paid` / `run-paid` 走主管级闸，真烧钱 |
+| paid 删除 | 未实现 | `delete-paid` 是桩，返回 `E_NOT_IMPL=64` |
+| 冷登录 | 半残 | 仍依赖暖 profile，详见工程总报告 |
+| 分发 | 未产品化 | example 配置已准备，真实 `system.json` / `channels/*.json` 本机持有 |
+| 主管锁 | 未产品化 | 当前只有 `WEILAI_SUPERVISOR=1` 环境变量闸 |
+
+---
+
+## 命令模型
+
+### free / paid 标签
+
+| 标签 | 配置角色 | 用途 | 风险 |
+|------|----------|------|------|
+| `free` | `role="test"` | 免费测试通道，筛过审 | 默认通道 |
+| `paid` | `role="delivery"` | 付费投放通道，真投放 | 主管级，默认锁定 |
+
+`free` / `paid` 是命令层标签；台账内部键来自本机 `channels/*.json`，当前常见为 `jie3` / `jie6`。不要把 `jie3` / `jie6` 当成日常命令入口。
+
+### 空格 vs 横杠
+
+规则固定为：**空格=普通参数；横杠=产品化入口/风险边界**。
+
+正确：
+
+```powershell
+node bin/weilai.mjs upload
+node bin/weilai.mjs upload-paid
+node bin/weilai.mjs status paid
+node bin/weilai.mjs config get paid maxUploads
 ```
 
-## 目录结构
-```
-bin/weilai.mjs      CLI 入口 / 声明式命令注册表 / 别名 / 主管闸 / 通道解析 / argv 护栏（拒中文）
-bin/cmds/           各子命令（看/会话/流水线/编排/维护/主管 六组；旧名保留为别名）
-lib/                共享库：config/state/cdp/session/guard/sync/upload/submit/delete/md5fix/clearlocal/telemetry/bandit/concurrency/tier/config-write/selectors/log
-channels/           通道配置 jie3.json(free) / jie6.json(paid)（账户/计划/端口 24601-2/模式/maxUploads）
-system.json         机器 + 项目级配置（项目根、关键词、chrome、ffmpeg、路径、超时、并发）
-docs/               工程总报告（权威总览）/ PLAN（设计底稿）/ archive（旧日报 + 已并入报告的参考文档）
-archive/            旧 probe 一次性件归档
+错误：
+
+```powershell
+node bin/weilai.mjs upload paid
+node bin/weilai.mjs ready paid
+node bin/weilai.mjs sync paid
 ```
 
-## 设计速读（详见 `docs/PLAN.md`）
-三个核心设计动作：
-1. **session = 状态收敛三层**（7 探针 + 8 幂等动作 + 1 调度器 `ready`）——人停在任意页面也能收敛到上传就绪。
-2. **上传解耦**——字节传输与提交分离；逐文件超时（龟速件踢回、不拖整批）；延迟挂起 + 择时秒提交。
-3. **旁路遥测**——被动记录不干扰操作，分时段统计上传/审核/过审率，回喂择时。
+这些裸组合会在进入业务逻辑前返回 `E_USAGE=2`。
 
-## 安全约定
-- 破坏性操作（删除）**默认 dry-run**，`--apply` 才动平台。
-- 失败靠**重跑同一条命令**续跑（台账即检查点）。
-- 只动含项目关键词的文件；账户/计划由配置锁定，漂移即停（不误删有钱账户）。
-- 凭据**不入库**（见 `.gitignore`）。
+### paid 主管闸
+
+任何 paid 写操作都要先显式解锁：
+
+```powershell
+$env:WEILAI_SUPERVISOR = "1"
+node bin/weilai.mjs upload-paid
+```
+
+普通 `--help` 不显示主管级命令；查看全集：
+
+```powershell
+node bin/weilai.mjs --help-all
+```
+
+---
+
+## 日常操作
+
+### 只读体检
+
+```powershell
+node bin/weilai.mjs doctor
+node bin/weilai.mjs scan
+node bin/weilai.mjs status
+```
+
+- `doctor`：检查磁盘、Chrome、ffmpeg、端口、台账、通道配置。
+- `scan`：查看调试 Chrome 是否在跑、标签是否在位。
+- `status`：读取本地台账汇总，不碰平台。
+
+### free 日常跑量
+
+```powershell
+node bin/weilai.mjs run
+```
+
+`run` 默认只走 free，是日常主力。长跑日志会落到 `logs/run-<日期>.log`。
+
+### free 手动一轮
+
+```powershell
+node bin/weilai.mjs ready
+node bin/weilai.mjs sync
+node bin/weilai.mjs delete
+node bin/weilai.mjs delete --apply
+node bin/weilai.mjs md5fix
+node bin/weilai.mjs upload
+node bin/weilai.mjs sync
+node bin/weilai.mjs status
+```
+
+`delete` 默认 dry-run，确认清单后再加 `--apply`。
+
+### paid 投放
+
+```powershell
+$env:WEILAI_SUPERVISOR = "1"
+node bin/weilai.mjs ready-paid
+node bin/weilai.mjs sync-paid
+node bin/weilai.mjs upload-paid
+```
+
+持续跑 paid：
+
+```powershell
+$env:WEILAI_SUPERVISOR = "1"
+node bin/weilai.mjs run-paid
+```
+
+free + paid 双通道：
+
+```powershell
+$env:WEILAI_SUPERVISOR = "1"
+node bin/weilai.mjs run-both
+```
+
+### 排查单件
+
+```powershell
+node bin/weilai.mjs inspect 张晟钰
+node bin/weilai.mjs whoami
+node bin/weilai.mjs monitor-report
+```
+
+`inspect <名字片段>` 是只读台账搜索，允许中文；其他命令行参数保持 ASCII。
+
+---
+
+## 命令清单
+
+### 看 / 体检
+
+| 命令 | 别名 | 作用 |
+|------|------|------|
+| `doctor [--fix]` | `preflight` | 环境自检；`--fix` 尝试修补机器配置 |
+| `status [both/free/paid]` | `st` | 台账分阶段/分通道汇总 |
+| `inspect <名字片段>` | `show`, `find` | 查某个视频在台账里的状态 |
+| `scan` | `ps` | 扫调试 Chrome 和目标标签 |
+| `whoami` | - | 检查 free 标签/会话 |
+| `monitor` | - | 录 free 遥测 |
+| `monitor-report` | `stats`, `traffic` | 读 free 遥测报表 |
+| `passrate` | - | 分时段过审率和建议提交时段 |
+
+### 会话 / 流水线
+
+| 命令 | 别名 | 作用 | 风险 |
+|------|------|------|------|
+| `open` | - | 启动 free 调试 Chrome，不收敛 | 浏览器 |
+| `ready` | - | 收敛 free 到上传就绪 | 浏览器 |
+| `close` | - | 优雅关闭 free 调试 Chrome | 浏览器 |
+| `login` | - | 交互式录入端口、凭据、通道标识 | 写配置 |
+| `sync` | - | 拉 free 审核归台账 | 写台账 |
+| `delete [--apply]` | - | 删除过审/被拒副本腾槽 | 默认 dry-run |
+| `md5fix` | - | 对待传/重传清单改 MD5 | 写本地 |
+| `upload` | - | free 真上传 | 写平台 |
+| `reconcile [--apply]` | - | 对账幻影上传并 un-bump | 默认 dry-run |
+| `prep [--apply]` | - | `sync -> delete -> md5fix` | delete 段默认 dry-run |
+| `cycle [--rounds N] [--apply]` | `test-round` | free 多轮收敛 | 写平台 |
+| `run` | `flywheel` | free 飞轮 | 写平台 |
+| `clear-local [--apply]` | - | 清本地源和 md5fix 孤儿副本 | 默认 dry-run |
+| `config get/set ...` | - | 读写配置旋钮 | set 默认 dry-run |
+
+### 主管级 paid
+
+| 命令 | 别名 | 作用 | 状态 |
+|------|------|------|------|
+| `ready-paid` | - | 收敛 paid 到上传就绪 | 可用 |
+| `open-paid` | - | 启动 paid 调试 Chrome | 可用 |
+| `close-paid` | - | 关闭 paid 调试 Chrome | 可用 |
+| `whoami-paid` | - | 检查 paid 标签/会话 | 可用 |
+| `sync-paid` | - | 拉 paid 审核归台账 | 可用 |
+| `upload-paid` | - | paid 真上传 | 可用，真烧钱 |
+| `reconcile-paid` | - | paid 幻影上传对账 | 可用 |
+| `monitor-paid` | - | 录 paid 遥测 | 可用 |
+| `monitor-report-paid` | `stats-paid`, `traffic-paid` | 读 paid 遥测报表 | 可用 |
+| `run-paid` | - | paid 飞轮 | 可用，真烧钱 |
+| `run-both` | - | free + paid 双通道飞轮 | 可用，真烧钱 |
+| `cycle-paid` | `deliver-round` | paid 多轮 | 可用，真烧钱 |
+| `delete-paid` | `sweep` | paid 腾槽 | 未实现桩，返回 64 |
+| `hold-submit` | - | 择时挂起提交 | 未实现桩，返回 64 |
+
+不新增：`status-paid`、`config-paid`、`prep-paid`、`md5fix-paid`、`passrate-paid`。
+
+---
+
+## 配置与数据
+
+### 入库模板
+
+| 文件 | 作用 |
+|------|------|
+| `system.example.json` | 机器/项目级配置模板 |
+| `channels/jie3.example.json` | free/test 通道模板 |
+| `channels/jie6.example.json` | paid/delivery 通道模板 |
+
+### 本机真实文件
+
+| 文件 | 作用 |
+|------|------|
+| `system.json` | 本机真实路径、关键词、Chrome、ffmpeg、超时、并发 |
+| `channels/*.json` | 本机真实通道：aavid、planId、port、role、ui、maxUploads |
+| `secrets.json` | 母账号凭据，或用环境变量替代 |
+| `_video_state.json` | 机器真源台账，位置由 `system.json.project.ledgerPath` 决定 |
+
+真实配置和凭据不入库。换机器时先跑：
+
+```powershell
+node bin/weilai.mjs doctor --fix
+```
+
+配置旋钮可以用命令读写，写入默认 dry-run：
+
+```powershell
+node bin/weilai.mjs config get system daemon.pollFloorSec
+node bin/weilai.mjs config set free maxUploads 7
+node bin/weilai.mjs config set free maxUploads 7 --apply
+```
+
+中文账户名、中文计划名等不要走命令行，写 JSON。
+
+---
+
+## 安全边界
+
+1. **绝不杀 Chrome**：不要用 `Stop-Process chrome` 或 `taskkill /IM chrome.exe`。只用 `close` / `close-paid`。
+2. **先 dry-run 再 apply**：`delete`、`clear-local`、`reconcile` 默认只打印清单。
+3. **paid 必须解锁**：任何 paid 写操作都要用户确认，再设置 `WEILAI_SUPERVISOR=1`。
+4. **命令行保持 ASCII**：中文业务值写 JSON；`inspect <名字>` 是只读例外。
+5. **失败靠重跑续跑**：台账是检查点，不要靠手改平台状态“修复”。
+6. **未实现桩返回 64**：`delete-paid` / `hold-submit` 不会假装成功。
+
+---
+
+## 开发与验证
+
+语法检查：
+
+```powershell
+Get-ChildItem -Recurse -Filter *.mjs | ForEach-Object { node --check $_.FullName }
+```
+
+离线测试：
+
+```powershell
+node test/cli-behavior-test.mjs
+node test/config-test.mjs
+node test/sysrepair-test.mjs
+node test/reconcile-test.mjs
+node test/ledger-concurrency.mjs
+node test/leaf-ledger-integration.mjs
+node test/render-artifacts-test.mjs
+node test/log-file-test.mjs
+```
+
+开发约定：
+
+- `bin/weilai.mjs` 的 `COMMANDS` 是命令注册表单一真源。
+- `channels/*.json` 是通道事实真源。
+- `lib/state.mjs` 是台账状态机。
+- 真平台能力必须有 dry-run、主管闸或明确风险边界。
+- 手工探针脚本放 `test/manual/`，不参与标准测试。
+
+---
+
+## 项目结构
+
+```
+weilai-01/
+├── bin/
+│   ├── weilai.mjs              # CLI 入口、命令注册表、通道解析、主管闸
+│   └── cmds/                   # 子命令
+├── lib/                        # CDP、session、guard、state、sync、upload、flywheel 等共享库
+├── channels/                   # 通道 example 配置；真实 *.json 本机持有
+├── docs/
+│   ├── 工程总报告.md           # 当前唯一权威总览
+│   ├── PLAN.md                 # 历史设计底稿
+│   └── archive/                # 旧日报和参考文档
+├── skill/weilai/SKILL.md       # 给 AI/Codex 使用的操作技能说明
+├── test/                       # 自动化离线测试
+├── test/manual/                # 手工压测/探针脚本
+├── system.example.json
+├── package.json
+└── README.md
+```
+
+运行时本机文件：
+
+```
+system.json
+channels/*.json
+secrets.json
+logs/
+telemetry-out/
+```

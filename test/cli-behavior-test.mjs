@@ -10,6 +10,17 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 const NODE = process.execPath;
 const CLI = join(ROOT, 'bin', 'weilai.mjs');
+const PAID_WRAPPERS = [
+  'ready-paid',
+  'open-paid',
+  'close-paid',
+  'whoami-paid',
+  'sync-paid',
+  'upload-paid',
+  'reconcile-paid',
+  'monitor-paid',
+  'monitor-report-paid',
+];
 
 function run(args, env = {}) {
   return spawnSync(NODE, [CLI, ...args], {
@@ -46,6 +57,31 @@ function assertExit(args, status, msg, env = {}) {
   console.log('✓ --as 标签解析和缺值错误符合预期');
 }
 
+{
+  const r = assertExit(['--help'], 0, '--help 应成功');
+  for (const cmd of PAID_WRAPPERS) {
+    assert.ok(!r.stdout.includes(cmd), `--help 不应显示主管级 ${cmd}`);
+  }
+  assert.ok(!r.stdout.includes('stats-paid'), '--help 不应显示 stats-paid 别名');
+  assert.ok(!r.stdout.includes('traffic-paid'), '--help 不应显示 traffic-paid 别名');
+  console.log('✓ 默认 help 隐藏 paid 包装命令');
+}
+
+{
+  const r = assertExit(['--help-all'], 0, '--help-all 应成功');
+  for (const cmd of PAID_WRAPPERS) {
+    assert.ok(r.stdout.includes(cmd), `--help-all 应显示 ${cmd}`);
+  }
+  assert.ok(r.stdout.includes('stats-paid'), '--help-all 应显示 stats-paid 别名');
+  assert.ok(r.stdout.includes('traffic-paid'), '--help-all 应显示 traffic-paid 别名');
+  console.log('✓ help-all 显示 paid 包装命令和别名');
+}
+
+for (const cmd of PAID_WRAPPERS) {
+  assertExit([cmd, '--json'], 2, `${cmd} 未解锁应 E_USAGE(2)`);
+}
+console.log('✓ paid 包装命令未解锁均 E_USAGE');
+
 for (const [flag, value] of [['--batch', 'abc'], ['--poll-floor', '0'], ['--poll-ceil', '-1'], ['--full-sync', '1.5']]) {
   assertExit(['run', flag, value], 2, `run ${flag} ${value} 应 E_USAGE(2)`);
 }
@@ -54,6 +90,8 @@ console.log('✓ run 数字参数非法值均 E_USAGE');
 
 for (const args of [
   ['run', 'paid'],
+  ['ready', 'paid'],
+  ['sync', 'paid'],
   ['upload', 'paid', '--json'],
 ]) {
   assertExit(args, 2, `${args.join(' ')} 裸通道组合应 E_USAGE(2)`);
