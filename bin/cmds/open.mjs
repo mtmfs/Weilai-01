@@ -10,7 +10,9 @@ export async function runOpen({ flags, pos }) {
   const port = cfg.target.port;
   const already = await probeChromePort(port);
   const ok = already ? true : await launchChrome(cfg.system, cfg.profile, port);
-  if (ok) log.ok(`${already ? '已在跑' : '已启动'} 调试 Chrome :${port}（通道 ${id}·未收敛——自行导航后用 run 接管，或 ready 自动收敛）`);
+  const readyCmd = cfg.target.role === 'delivery' ? 'ready-paid' : 'ready';
+  const runCmd = cfg.target.role === 'delivery' ? 'run-paid' : 'run';
+  if (ok) log.ok(`${already ? '已在跑' : '已启动'} 调试 Chrome :${port}（通道 ${id}·未收敛——自行导航后用 ${runCmd} 接管，或 ${readyCmd} 自动收敛）`);
   if (flags.json) out({ command: 'open', target: id, port, launched: !already, running: ok });
   if (!ok) { const e = new Error(`Chrome :${port} 起不来（检查 system.json chrome.path / 磁盘）`); e.code = 'E_CONFIG'; throw e; }
 }

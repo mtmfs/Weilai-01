@@ -65,7 +65,7 @@ const COMMANDS = {
   // ── 编排 ──
   prep:             { group: '编排', run: runPrep,        channel: 'free', danger: 'platform', help: 'sync→delete→md5fix（备料不传；delete 段 dry-run）' },
   cycle:            { group: '编排', run: runCycle,       channel: 'free', danger: 'platform', help: '免费多轮收敛（轮间不死等）', aliases: ['test-round'] },
-  run:              { group: '编排', run: runRun,         channel: 'free', danger: 'platform', passChannels: true, help: '免费飞轮（=旧 run --jie3，日常主力）', aliases: ['flywheel'] },
+  run:              { group: '编排', run: runRun,         channel: 'free', danger: 'platform', passChannels: true, help: '免费飞轮（日常主力）', aliases: ['flywheel'] },
   // ── 维护 ──
   config:           { group: '维护', run: runConfigCmd,   channel: 'raw',  danger: 'local',    help: '读/改配置旋钮（get/set；set dry-run 默认）' },
   'clear-local':    { group: '维护', run: runClearLocalCmd, channel: 'none', danger: 'local',  help: '清本地源 + md5fix 孤儿副本（dry-run 默认）' },
@@ -81,8 +81,8 @@ const COMMANDS = {
   'monitor-report-paid': { group: '主管', run: runStatsCmd, channel: 'paid', danger: 'read', tier: 'super', help: '读付费通道 monitor 录制报表', aliases: ['stats-paid', 'traffic-paid'] },
   'run-paid':       { group: '主管', run: runRun,         channel: 'paid', danger: 'platform', tier: 'super', passChannels: true, help: '付费飞轮' },
   'run-both':       { group: '主管', run: runRun,         channel: 'both', danger: 'platform', tier: 'super', passChannels: true, help: 'free+paid 双通道并发飞轮' },
-  'cycle-paid':     { group: '主管', run: runCycle,       channel: 'paid', danger: 'platform', tier: 'super', help: '付费多轮（跳 delete）', aliases: ['deliver-round'] },
-  'delete-paid':    { group: '主管', run: runDeleteCmd,   channel: 'paid', danger: 'platform', tier: 'super', impl: false, help: '付费腾槽（未实现）', aliases: ['sweep'] },
+  'cycle-paid':     { group: '主管', run: runCycle,       channel: 'paid', danger: 'platform', tier: 'super', help: '付费多轮', aliases: ['deliver-round'] },
+  'delete-paid':    { group: '主管', run: runDeleteCmd,   channel: 'paid', danger: 'platform', tier: 'super', help: '付费腾槽（dry-run 默认）', aliases: ['sweep'] },
   // ── 桩（隐藏，调用报未实现）──
   'hold-submit':    { group: '桩', channel: 'free', danger: 'platform', impl: false, help: '择时挂起提交（未实现）' },
 };
@@ -148,7 +148,7 @@ function usage(showAll = false) {
     'Weilai-01 — 千川双通道过审流水线 CLI',
     '',
     '用法: weilai <命令> [--json] [--dry-run|--apply] [--as <id>]',
-    '通道: 裸命令默认 free(免费测试号)；-paid 后缀 / --as 选 paid(付费投放号·主管级)',
+    '通道: 通道绑定命令默认 free；-paid 后缀 / --as 选 paid(主管级)。raw 命令用位置参数，如 status paid。',
     '',
   ];
   for (const g of ['看', '会话', '流水线', '编排', '维护', '主管', '桩']) {
@@ -212,6 +212,11 @@ async function main() {
   try {
     // 通道解析 + 主管闸（碰付费号 / super 命令 → 须解锁）。raw/none 不解析通道。
     const needsResolve = entry.channel !== 'raw' && entry.channel !== 'none';
+    if (!needsResolve && flags.as) {
+      const e = new Error(`命令 \`${cmd}\` 不支持 --as；若该命令支持通道，请用它的显式位置参数（如 \`status paid\` / \`config get paid ...\`）。`);
+      e.code = 'E_USAGE';
+      throw e;
+    }
     const targets = needsResolve ? resolveTargets(entry, flags) : { ids: [], touchesPaid: false };
     if ((entry.tier === 'super' || targets.touchesPaid) && !supervisorUnlocked()) {
       writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n解锁：设环境变量 WEILAI_SUPERVISOR=1 后重试（PowerShell: $env:WEILAI_SUPERVISOR=1）。`);

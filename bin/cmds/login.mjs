@@ -143,6 +143,6 @@ export async function runLogin({ flags }) {
   }
   const written = await commit({ ...input, log });
   if (!written.length) log.warn('未写入任何通道（未提供 aavid/planId）');
-  else log.ok(`login 完成：配置 ${written.map(w => w.role).join('+')}。下一步：\`ready free\` 登录就绪 → \`scan\` 确认标签。`);
+  else log.ok(`login 完成：配置 ${written.map(w => w.role).join('+')}。下一步：free 跑 \`ready\`；paid 跑 \`ready-paid\`（需主管解锁）；再用 \`scan\` 确认标签。`);
   if (flags.json) out({ command: 'login', written });
 }

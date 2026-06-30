@@ -6,7 +6,7 @@ import { log, out } from '../../lib/log.mjs';
 
 export async function runStatsCmd({ flags, pos }) {
   const id = pos[0] || channelRegistry().testId;
-  const file = flags.file || join(ROOT, 'telemetry-out', `rec-${id}.jsonl`);
+  const file = flags.file || flags.out || join(ROOT, 'telemetry-out', `rec-${id}.jsonl`);
   const res = statsFromFile(file);
   if (flags.json) { out({ command: 'stats', file, ...res }); return; }
   log.info(`分时段统计 ${file}（${res.events} 事件）`);

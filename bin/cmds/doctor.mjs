@@ -44,7 +44,13 @@ export async function runDoctor({ flags }) {
 
   let sys;
   try { sys = loadSystem(); ok('system.json', true, '可读'); }
-  catch (e) { ok('system.json', false, e.message); if (flags.json) out({ command: 'doctor', checks, ok: false }); return; }
+  catch (e) {
+    ok('system.json', false, e.message);
+    if (flags.json) out({ command: 'doctor', checks, ok: false });
+    const x = new Error('doctor 发现配置不可用：' + e.message);
+    x.code = 'E_CONFIG';
+    throw x;
+  }
 
   for (const [name, p] of [['C:', 'C:\\'], ['台账盘 flatRoot', sys.project.flatRoot], ['md5fix 盘', sys.md5fix.outDir]]) {
     const g = freeGB(p); ok(`磁盘 ${name}`, g != null && g > 2, g == null ? `测不到 ${p}` : `${g.toFixed(1)} GB 可用`);
@@ -61,4 +67,9 @@ export async function runDoctor({ flags }) {
   const fails = checks.filter(c => !c.pass);
   log[fails.length ? 'warn' : 'ok'](`体检完：${checks.length - fails.length}/${checks.length} 通过${fails.length ? '；注意上面 ✗' : '，环境就绪'}`);
   if (flags.json) out({ command: 'doctor', checks, ok: !fails.length });
+  if (fails.length) {
+    const e = new Error(`doctor 发现 ${fails.length} 项失败：${fails.map(f => f.name).join(', ')}`);
+    e.code = 'E_CONFIG';
+    throw e;
+  }
 }

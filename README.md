@@ -40,7 +40,7 @@ Weilai-01 把「素材过审」拆成一组可重跑、可对账、可被 AI/非
 |------|------|------|
 | free 流水线 | 可日常用 | `ready` / `sync` / `delete` / `md5fix` / `upload` / `run` |
 | paid 上传 | 可用但谨慎 | `upload-paid` / `run-paid` 走主管级闸，真烧钱 |
-| paid 删除 | 未实现 | `delete-paid` 是桩，返回 `E_NOT_IMPL=64` |
+| paid 删除 | 可用但谨慎 | `delete-paid` / `sweep`，dry-run 默认，真删需 `--apply` |
 | 冷登录 | 半残 | 仍依赖暖 profile，详见工程总报告 |
 | 分发 | 未产品化 | example 配置已准备，真实 `system.json` / `channels/*.json` 本机持有 |
 | 主管锁 | 未产品化 | 当前只有 `WEILAI_SUPERVISOR=1` 环境变量闸 |
@@ -220,7 +220,7 @@ node bin/weilai.mjs monitor-report
 | `run-paid` | - | paid 飞轮 | 可用，真烧钱 |
 | `run-both` | - | free + paid 双通道飞轮 | 可用，真烧钱 |
 | `cycle-paid` | `deliver-round` | paid 多轮 | 可用，真烧钱 |
-| `delete-paid` | `sweep` | paid 腾槽 | 未实现桩，返回 64 |
+| `delete-paid` | `sweep` | paid 腾槽 | 可用，dry-run 默认 |
 | `hold-submit` | - | 择时挂起提交 | 未实现桩，返回 64 |
 
 不新增：`status-paid`、`config-paid`、`prep-paid`、`md5fix-paid`、`passrate-paid`。
@@ -271,7 +271,7 @@ node bin/weilai.mjs config set free maxUploads 7 --apply
 3. **paid 必须解锁**：任何 paid 写操作都要用户确认，再设置 `WEILAI_SUPERVISOR=1`。
 4. **命令行保持 ASCII**：中文业务值写 JSON；`inspect <名字>` 是只读例外。
 5. **失败靠重跑续跑**：台账是检查点，不要靠手改平台状态“修复”。
-6. **未实现桩返回 64**：`delete-paid` / `hold-submit` 不会假装成功。
+6. **未实现桩返回 64**：`hold-submit` 不会假装成功。
 
 ---
 

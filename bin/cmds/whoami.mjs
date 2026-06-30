@@ -3,13 +3,20 @@ import { loadConfig } from '../../lib/config.mjs';
 import { probeChromePort, probeTab } from '../../lib/session.mjs';
 import { log, out } from '../../lib/log.mjs';
 
+function suggest(base, cfg) {
+  if (cfg.target.role !== 'delivery') return base;
+  if (base === 'open') return 'open-paid';
+  if (base === 'ready') return 'ready-paid';
+  return `${base} --as paid`;
+}
+
 export async function runWhoami({ flags, pos }) {
   const id = pos[0];
   const cfg = loadConfig(id);
   const { port, aavid, planId, account } = cfg.target;
-  if (!await probeChromePort(port)) { log.warn(`Chrome :${port} 没在跑——先 \`open ${id}\` 或 \`ready ${id}\``); if (flags.json) out({ command: 'whoami', target: id, running: false }); return; }
+  if (!await probeChromePort(port)) { log.warn(`Chrome :${port} 没在跑——先 \`${suggest('open', cfg)}\` 或 \`${suggest('ready', cfg)}\``); if (flags.json) out({ command: 'whoami', target: id, running: false }); return; }
   const tab = await probeTab(port, aavid);
-  if (!tab) { log.warn(`:${port} 在跑但无本号(aavid=${aavid})标签——先 \`ready ${id}\` 收敛`); if (flags.json) out({ command: 'whoami', target: id, running: true, tab: false }); return; }
+  if (!tab) { log.warn(`:${port} 在跑但无本号(aavid=${aavid})标签——先 \`${suggest('ready', cfg)}\` 收敛`); if (flags.json) out({ command: 'whoami', target: id, running: true, tab: false }); return; }
   log.ok(`通道 ${id} 标签在位：aavid=${aavid} / planId=${planId}${account ? `（config account=${account}，未校验）` : ''}`);
   if (flags.json) out({ command: 'whoami', target: id, running: true, tab: true, aavid, planId, configuredAccount: account || null, accountProbe: false });
 }

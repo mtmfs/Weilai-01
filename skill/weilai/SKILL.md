@@ -119,7 +119,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 | `monitor-paid` / `monitor-report-paid` | stats-paid, traffic-paid | paid 遥测录制 / 报表 | ✅ ⚠️💰 |
 | `run-paid` / `run-both` | — | 付费 / free+paid 双通道飞轮 | ✅ ⚠️💰 真烧钱 |
 | `cycle-paid` | deliver-round | 付费多轮 | ✅ ⚠️💰 |
-| `delete-paid` | sweep | 付费腾槽 | ❌ 未实现（桩） |
+| `delete-paid` | sweep | 付费腾槽 | ✅ ⚠️💰 dry-run 默认 |
 
 ---
 
@@ -144,11 +144,11 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 
 裸命令默认走 **free**（免费测试通道），日常主力、安全。碰 **paid**（真实花钱通道）的命令是主管级、默认锁定：
 
-- 常用 paid 包装命令：`ready-paid/open-paid/close-paid/whoami-paid/sync-paid/upload-paid/reconcile-paid/monitor-paid/monitor-report-paid/run-paid/run-both/cycle-paid/delete-paid`，或任意命令加 `--as paid`；
+- 常用 paid 包装命令：`ready-paid/open-paid/close-paid/whoami-paid/sync-paid/upload-paid/reconcile-paid/monitor-paid/monitor-report-paid/run-paid/run-both/cycle-paid/delete-paid`；支持通道绑定的命令也可加 `--as paid`；
 - 都需先设环境变量解锁：PowerShell `$env:WEILAI_SUPERVISOR=1`；
 - **绝不擅自解锁**，必须用户明确要投放。
 
-`status paid`、`config get paid ...` 这类 raw 参数命令保持空格写法；不新增 `status-paid/config-paid/prep-paid/md5fix-paid/passrate-paid`。`free`/`paid` 只是命令面标签，台账内部键来自本机 `channels/*.json`（当前常见为 `jie3`/`jie6`）。
+`status paid`、`config get paid ...` 这类 raw 参数命令保持空格写法，不支持 `--as`；`scan`、`inspect`、`clear-local` 这类无通道命令也不支持 `--as`。不新增 `status-paid/config-paid/prep-paid/md5fix-paid/passrate-paid`。`free`/`paid` 只是命令面标签，台账内部键来自本机 `channels/*.json`（当前常见为 `jie3`/`jie6`）。
 
 ---
 
@@ -156,12 +156,12 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 
 **能稳定用**（前提：free 的 profile 保持登录态）：
 
-- free 测试通道**非上传 + 上传**全流水线：`doctor`/`status`/`inspect`/`scan`/`whoami`/`open`/`ready`/`sync`/`delete --dry`/`md5fix`/`upload`/`cycle`/`run`/`clear-local`/`close`/`monitor`/`passrate`。
+- free 测试通道**非上传 + 上传**全流水线：`doctor`/`status`/`inspect`/`scan`/`whoami`/`open`/`ready`/`sync`/`delete`（默认 dry-run）/`md5fix`/`upload`/`cycle`/`run`/`clear-local`/`close`/`monitor`/`passrate`。
 - `run`（免费飞轮）是日常主力：跨 tick 不死等、md5fix 并行、自适应退避。
 
 **还不能用 / 半残**：
 
-- **paid 半条腿**：能传不能删（`delete-paid` 是桩）、冷 profile 登录链有 bug（靠暖 profile）。`upload-paid`/`run-paid`/`run-both` 机制打通，但长时无人值守未验证。
+- **paid 仍需谨慎**：`delete-paid` 已支持 creative-tab 腾槽；冷 profile 登录链仍有 bug（靠暖 profile）。`upload-paid`/`run-paid`/`run-both` 机制打通，但长时无人值守未验证。
 - `hold-submit`（择时挂起提交）= 桩。
 - `login` 只写端口/凭据/aavid/planId/maxUploads 等配置，不再探测或回填账户名；冷登录失败时配置仍保存，后续用 `scan`/`whoami` 确认标签。
 

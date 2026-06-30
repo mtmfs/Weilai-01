@@ -19,7 +19,7 @@ export async function runMonitor({ flags, pos }) {
   const id = pos[0] || channelRegistry().testId;
   const cfg = loadConfig(id);
   const seconds = positiveIntFlag(flags, 'seconds', 1800);
-  const outFile = join(ROOT, 'telemetry-out', `rec-${id}.jsonl`);
+  const outFile = flags.out || join(ROOT, 'telemetry-out', `rec-${id}.jsonl`);
   const res = await record(cfg.target.port, { seconds, outFile, log });
   if (flags.json) out({ command: 'monitor', target: id, ...res });
 }

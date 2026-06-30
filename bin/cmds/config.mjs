@@ -5,7 +5,7 @@
 // ★敏感字段（aavid/planId/funded/maxUploads，驱动有钱号真实投放/支出）dry-run 时额外 ⚠ 告警。
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ROOT, loadTarget, REQUIRED_TARGET, labelToId } from '../../lib/config.mjs';
+import { ROOT, loadTarget, REQUIRED_TARGET, resolveChannelArg } from '../../lib/config.mjs';
 import { saveJson, getByPath, setByPath, coerceScalar } from '../../lib/config-write.mjs';
 import { log, out, writeText } from '../../lib/log.mjs';
 
@@ -32,6 +32,11 @@ function resolveTarget(id) {
     catch (e) { cfgErr(`读取/解析 ${path} 失败：${e.message}`); }
   }
   return { path: join(ROOT, 'channels', `${id}.json`), obj: loadTarget(id), isChannel: true, id };
+}
+
+function resolveConfigLabel(label) {
+  if (label === 'system') return 'system';
+  return resolveChannelArg(label, '用法: weilai config <get|set> <system|free|paid|通道> <a.b.c> [value]');
 }
 
 function doGet({ id, key, json }) {
@@ -77,11 +82,11 @@ export async function runConfigCmd({ flags, pos }) {
   if (action === 'get') {
     const [, label, key] = pos;
     if (!label || !key) usageErr('用法: weilai config get <system|free|paid> <a.b.c> [--json]');
-    doGet({ id: labelToId(label), key, json: !!flags.json });
+    doGet({ id: resolveConfigLabel(label), key, json: !!flags.json });
   } else if (action === 'set') {
     const [, label, key, value] = pos;
     if (!label || !key || value === undefined) usageErr('用法: weilai config set <system|free|paid> <a.b.c> <value> [--apply]（默认 dry-run；中文值请手改 JSON）');
-    doSet({ id: labelToId(label), key, rawValue: value, apply: !!flags.apply, json: !!flags.json });
+    doSet({ id: resolveConfigLabel(label), key, rawValue: value, apply: !!flags.apply, json: !!flags.json });
   } else {
     usageErr('用法: weilai config <get|set> <system|free|paid> <a.b.c> [value] [--apply|--json]');
   }

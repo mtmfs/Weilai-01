@@ -20,6 +20,7 @@ const PAID_WRAPPERS = [
   'reconcile-paid',
   'monitor-paid',
   'monitor-report-paid',
+  'delete-paid',
 ];
 
 function run(args, env = {}) {
@@ -42,12 +43,6 @@ function assertExit(args, status, msg, env = {}) {
   const r = assertExit(['hold-submit', '--json'], 64, 'hold-submit 应退出 64');
   assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'hold-submit JSON 应保留 implemented=false');
   console.log('✓ hold-submit 桩退出 64 且 JSON 保持');
-}
-
-{
-  const r = assertExit(['delete-paid', '--json'], 64, 'delete-paid 桩应退出 64', { WEILAI_SUPERVISOR: '1' });
-  assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'delete-paid JSON 应保留 implemented=false');
-  console.log('✓ delete-paid 桩解锁后退出 64 且 JSON 保持');
 }
 
 {
@@ -97,6 +92,21 @@ for (const args of [
   assertExit(args, 2, `${args.join(' ')} 裸通道组合应 E_USAGE(2)`);
 }
 console.log('✓ 裸通道组合在进入业务逻辑前被拒绝');
+
+for (const args of [
+  ['status', 'nope'],
+  ['config', 'get', 'nope', 'port'],
+]) {
+  assertExit(args, 2, `${args.join(' ')} 未知通道应 E_USAGE(2) 而非 E_CONFIG`);
+}
+for (const args of [
+  ['status', '--as', 'paid'],
+  ['config', 'get', 'system', 'project.name', '--as', 'paid'],
+  ['scan', '--as', 'paid'],
+]) {
+  assertExit(args, 2, `${args.join(' ')} 不支持 --as 时应 E_USAGE(2)`);
+}
+console.log('✓ raw/none 命令的通道错误和 --as 误用均 E_USAGE');
 
 for (const args of [
   ['cycle', '--rounds', 'abc'],
