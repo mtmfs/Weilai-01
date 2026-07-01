@@ -26,8 +26,9 @@ import { runWhoami } from './cmds/whoami.mjs';
 import { runDoctor } from './cmds/doctor.mjs';
 import { runInspect } from './cmds/inspect.mjs';
 import { runLogin } from './cmds/login.mjs';
+import { runSupervisor } from './cmds/supervisor.mjs';
 import { channelRegistry, labelToId } from '../lib/config.mjs';
-import { supervisorUnlocked } from '../lib/tier.mjs';
+import { supervisorAuthStatus, supervisorUnlocked } from '../lib/tier.mjs';
 import { CODE_TO_EXIT } from '../lib/guard.mjs';
 import { out, writeText, writeErr } from '../lib/log.mjs';
 
@@ -71,6 +72,7 @@ const COMMANDS = {
   // ── 维护 ──
   config:           { group: '维护', run: runConfigCmd,   channel: 'raw',  danger: 'local',    help: '读/改配置旋钮（get/set；set dry-run 默认）' },
   'clear-local':    { group: '维护', run: runClearLocalCmd, channel: 'none', danger: 'local',  help: '清本地源 + md5fix 孤儿副本（dry-run 默认）' },
+  supervisor:       { group: '维护', run: runSupervisor,   channel: 'none', danger: 'local',    help: '主管 token / 临时解锁 / 全天解锁 / 上锁 / 状态' },
   // ── 主管级（默认隐藏 + 解锁才可跑）──
   'ready-paid':     { group: '主管', run: runReady,        channel: 'paid', danger: 'browser', tier: 'super', help: '付费通道收敛到上传就绪' },
   'open-paid':      { group: '主管', run: runOpen,         channel: 'paid', danger: 'browser', tier: 'super', help: '只启动付费通道 Chrome 实例、不收敛' },
@@ -95,7 +97,7 @@ for (const [name, c] of Object.entries(COMMANDS)) for (const a of (c.aliases || 
 // ★A2: 取值 flag。其余 `--xxx` 仍是布尔。
 const VALUE_FLAGS = new Set([
   'seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min', 'poll-floor', 'poll-ceil', 'full-sync', 'batch', 'delay-min',
-  'as', 'email', 'pwd',
+  'as', 'for', 'email', 'pwd',
   'free-aavid', 'free-plan', 'free-port', 'free-max',
   'paid-aavid', 'paid-plan', 'paid-port', 'paid-max',
 ]);
@@ -169,6 +171,14 @@ function usage(showAll = false) {
   return lines.join('\n');
 }
 
+function requiredSupervisorFeature(cmd, entry, flags) {
+  if (cmd === 'delete-paid' && flags.apply) return 'paid.delete';
+  if (entry.danger === 'read') return 'paid.read';
+  if (entry.danger === 'browser') return 'paid.browser';
+  if (entry.danger === 'ledger') return 'paid.ledger';
+  return 'paid.write';
+}
+
 function exitWithError(e) {
   const code = e && e.code;
   if (code && CODE_TO_EXIT[code] !== undefined) {
@@ -219,9 +229,13 @@ async function main() {
       throw e;
     }
     const targets = needsResolve ? resolveTargets(entry, flags) : { ids: [], touchesPaid: false };
-    if ((entry.tier === 'super' || targets.touchesPaid) && !supervisorUnlocked()) {
-      writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n解锁：设环境变量 WEILAI_SUPERVISOR=1 后重试（PowerShell: $env:WEILAI_SUPERVISOR=1）。`);
-      process.exit(EXIT.USAGE);
+    if (entry.tier === 'super' || targets.touchesPaid) {
+      const feature = requiredSupervisorFeature(cmd, entry, flags);
+      if (!supervisorUnlocked(feature)) {
+        const st = supervisorAuthStatus(feature);
+        writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n原因：${st.reason || '主管锁未解锁'}\n解锁：先 \`weilai supervisor install-token <token>\`，再 \`weilai supervisor unlock\`（默认 120 分钟）或 \`weilai supervisor unlock --all-day\`。`);
+        process.exit(EXIT.USAGE);
+      }
     }
 
     // 桩占位。

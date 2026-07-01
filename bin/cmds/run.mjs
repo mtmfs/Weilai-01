@@ -1,11 +1,11 @@
 // bin/cmds/run.mjs —— `weilai run`：常驻异步飞轮。
 // 通道：`run`=免费(裸默认·dispatcher 传 [testId])；`run-paid`/`run-both`=主管级（dispatcher 传通道列表）。
-// 兼容旧 flag：--jie3/--jie6/--no-jie6（含付费号须 WEILAI_SUPERVISOR=1 解锁）。
+// 兼容旧 flag：--jie3/--jie6/--no-jie6（含付费号须主管 token + session 解锁）。
 // SIGINT/SIGTERM 优雅停（等在途收尾，★绝不杀 Chrome）。
 import { join } from 'node:path';
 import { runFlywheel } from '../../lib/flywheel.mjs';
 import { ROOT, channelRegistry } from '../../lib/config.mjs';
-import { supervisorUnlocked } from '../../lib/tier.mjs';
+import { supervisorAuthStatus, supervisorUnlocked } from '../../lib/tier.mjs';
 import { log, enableFileLog } from '../../lib/log.mjs';
 
 const today = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
@@ -33,8 +33,9 @@ export async function runRun({ flags, channels: bound }) {
   }
   if (!channels.length) { const e = new Error(`用法: weilai run [--<通道>|--no-<通道>]（通道: ${ids.join('|')}）`); e.code = 'E_USAGE'; throw e; }
   // 主管闸：含付费号须解锁（覆盖 legacy --jie6 / --as paid 等到 paid 的路径）。
-  if (channels.includes(reg.delivId) && !supervisorUnlocked()) {
-    const e = new Error(`飞轮含付费号 ${reg.delivId}（主管级·付费投放），默认锁定：设 WEILAI_SUPERVISOR=1 解锁，或用 \`run\`（仅免费）。`); e.code = 'E_USAGE'; throw e;
+  if (channels.includes(reg.delivId) && !supervisorUnlocked('paid.write')) {
+    const st = supervisorAuthStatus('paid.write');
+    const e = new Error(`飞轮含付费号 ${reg.delivId}（主管级·付费投放），默认锁定：${st.reason || '主管锁未解锁'}。先 \`weilai supervisor unlock\`，或用 \`run\`（仅免费）。`); e.code = 'E_USAGE'; throw e;
   }
 
   // CLI 覆盖（其余取 system.json.daemon / flywheel.DAEMON_DEFAULTS）。
