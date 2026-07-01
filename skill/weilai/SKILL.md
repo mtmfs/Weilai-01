@@ -52,7 +52,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 ```
 
 - 默认人看输出（中文日志走 stderr）；加 `--json` 出机器结构化输出（stdout 只有 JSON）。
-- 退出码 `0`=成功，非 0 见[退出码对照](#退出码对照)。`--help` 看分组命令；`--help-all` 含主管级/桩/别名。
+- 退出码 `0`=成功，非 0 见[退出码对照](#退出码对照)。`--help` 看分组命令；`--help-all` 含主管级/隐藏别名。
 - 命名规则：**空格=普通参数；横杠=产品化入口/风险边界**。通道绑定命令不接受裸通道参数：不要跑 `ready jie3`、`run paid`、`upload paid`；用裸命令默认 free，或用 `--as free|paid|<id>`，或用 `upload-paid` / `run-paid` 这类后缀命令。
 - **长跑（`run` 飞轮）让用户在自己终端跑**：`! node I:\weilai-01\bin\weilai.mjs run`，`!` 前缀在用户会话里跑、免 AI 后台时限。
 - **交互式命令（`login`）让用户终端自跑**：AI 驱动会卡在 prompt。
@@ -156,13 +156,13 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 
 **能稳定用**（前提：free 的 profile 保持登录态）：
 
-- free 测试通道**非上传 + 上传**全流水线：`doctor`/`status`/`inspect`/`scan`/`whoami`/`open`/`ready`/`sync`/`delete`（默认 dry-run）/`md5fix`/`upload`/`cycle`/`run`/`clear-local`/`close`/`monitor`/`passrate`。
+- free 测试通道**非上传 + 上传**全流水线：`doctor`/`status`/`inspect`/`scan`/`whoami`/`open`/`ready`/`sync`/`delete`（默认 dry-run）/`md5fix`/`upload`/`hold-submit`/`cycle`/`run`/`clear-local`/`close`/`monitor`/`passrate`。
 - `run`（免费飞轮）是日常主力：跨 tick 不死等、md5fix 并行、自适应退避。
 
 **还不能用 / 半残**：
 
 - **paid 仍需谨慎**：`delete-paid` 已支持 creative-tab 腾槽；冷 profile 登录链仍有 bug（靠暖 profile）。`upload-paid`/`run-paid`/`run-both` 机制打通，但长时无人值守未验证。
-- `hold-submit`（择时挂起提交）= 桩。
+- `hold-submit` 已转正为显式延迟提交（`--delay-min`，默认 10）；只实测过 10 分钟窗口，更长择时窗口先跑探针。
 - `login` 只写端口/凭据/aavid/planId/maxUploads 等配置，不再探测或回填账户名；冷登录失败时配置仍保存，后续用 `scan`/`whoami` 确认标签。
 
 ---
@@ -215,8 +215,8 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 | 12 | E_SIG | 会话冷 / 签名失效 |
 | 14 | E_SELECTOR | 选择器漂移（需人修） |
 | 16 | E_FREEZE_SKIP | 上传冻结跳过（非致命） |
-| 20 | E_CONFIG | 配置/环境错（如 paid delete 未实现、缺 md5fix） |
-| 64 | E_NOT_IMPL | 未实现（如 hold-submit） |
+| 20 | E_CONFIG | 配置/环境错（如缺 md5fix） |
+| 64 | E_NOT_IMPL | 未实现命令 |
 
 ---
 

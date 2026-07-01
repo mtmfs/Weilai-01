@@ -1,4 +1,4 @@
-// 离线 CLI 行为测试：桩退出码、数字参数校验、login 写前校验。
+// 离线 CLI 行为测试：命令分发、数字参数校验、login 写前校验。
 // 跑：node test/cli-behavior-test.mjs
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
@@ -17,6 +17,7 @@ const PAID_WRAPPERS = [
   'whoami-paid',
   'sync-paid',
   'upload-paid',
+  'hold-submit-paid',
   'reconcile-paid',
   'monitor-paid',
   'monitor-report-paid',
@@ -40,16 +41,11 @@ function assertExit(args, status, msg, env = {}) {
 }
 
 {
-  const r = assertExit(['hold-submit', '--json'], 64, 'hold-submit 应退出 64');
-  assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'hold-submit JSON 应保留 implemented=false');
-  console.log('✓ hold-submit 桩退出 64 且 JSON 保持');
-}
-
-{
-  const r = assertExit(['hold-submit', '--as', 'paid', '--json'], 64, 'hold-submit --as paid 解锁后应保持桩退出 64', { WEILAI_SUPERVISOR: '1' });
-  assert.strictEqual(JSON.parse(r.stdout).implemented, false, 'hold-submit --as paid JSON 应保留 implemented=false');
+  assertExit(['hold-submit', '--delay-min', 'abc', '--json'], 2, 'hold-submit 非法 delay-min 应 E_USAGE(2)');
+  assertExit(['hold-submit', '--delay-min'], 2, 'hold-submit 缺少 delay-min 值应 E_USAGE(2)');
+  assertExit(['hold-submit', '--as', 'paid', '--delay-min', '0', '--json'], 2, 'hold-submit --as paid 未解锁应 E_USAGE(2)');
   assertExit(['hold-submit', '--as', '--json'], 2, '缺少 --as 值应 E_USAGE(2)');
-  console.log('✓ --as 标签解析和缺值错误符合预期');
+  console.log('✓ hold-submit 参数校验和主管锁符合预期');
 }
 
 {
@@ -88,6 +84,7 @@ for (const args of [
   ['ready', 'paid'],
   ['sync', 'paid'],
   ['upload', 'paid', '--json'],
+  ['hold-submit', 'paid', '--json'],
 ]) {
   assertExit(args, 2, `${args.join(' ')} 裸通道组合应 E_USAGE(2)`);
 }

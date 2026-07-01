@@ -197,6 +197,7 @@ node bin/weilai.mjs monitor-report
 | `delete [--apply]` | - | 删除过审/被拒副本腾槽 | 默认 dry-run |
 | `md5fix` | - | 对待传/重传清单改 MD5 | 写本地 |
 | `upload` | - | free 真上传 | 写平台 |
+| `hold-submit [--delay-min N]` | - | free 上传后挂起，延迟确认提交 | 写平台 |
 | `reconcile [--apply]` | - | 对账幻影上传并 un-bump | 默认 dry-run |
 | `prep [--apply]` | - | `sync -> delete -> md5fix` | delete 段默认 dry-run |
 | `cycle [--rounds N] [--apply]` | `test-round` | free 多轮收敛 | 写平台 |
@@ -214,6 +215,7 @@ node bin/weilai.mjs monitor-report
 | `whoami-paid` | - | 检查 paid 标签/会话 | 可用 |
 | `sync-paid` | - | 拉 paid 审核归台账 | 可用 |
 | `upload-paid` | - | paid 真上传 | 可用，真烧钱 |
+| `hold-submit-paid [--delay-min N]` | - | paid 上传后挂起，延迟确认提交 | 可用，真烧钱 |
 | `reconcile-paid` | - | paid 幻影上传对账 | 可用 |
 | `monitor-paid` | - | 录 paid 遥测 | 可用 |
 | `monitor-report-paid` | `stats-paid`, `traffic-paid` | 读 paid 遥测报表 | 可用 |
@@ -221,7 +223,6 @@ node bin/weilai.mjs monitor-report
 | `run-both` | - | free + paid 双通道飞轮 | 可用，真烧钱 |
 | `cycle-paid` | `deliver-round` | paid 多轮 | 可用，真烧钱 |
 | `delete-paid` | `sweep` | paid 腾槽 | 可用，dry-run 默认 |
-| `hold-submit` | - | 择时挂起提交 | 未实现桩，返回 64 |
 
 不新增：`status-paid`、`config-paid`、`prep-paid`、`md5fix-paid`、`passrate-paid`。
 
@@ -271,7 +272,7 @@ node bin/weilai.mjs config set free maxUploads 7 --apply
 3. **paid 必须解锁**：任何 paid 写操作都要用户确认，再设置 `WEILAI_SUPERVISOR=1`。
 4. **命令行保持 ASCII**：中文业务值写 JSON；`inspect <名字>` 是只读例外。
 5. **失败靠重跑续跑**：台账是检查点，不要靠手改平台状态“修复”。
-6. **未实现桩返回 64**：`hold-submit` 不会假装成功。
+6. **挂起提交先小窗口验证**：`hold-submit` 当前按 `--delay-min` 明确延迟，已实测 10 分钟窗口；更长择时窗口要先跑探针。
 
 ---
 

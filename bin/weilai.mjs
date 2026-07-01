@@ -13,6 +13,7 @@ import { runMd5fixCmd } from './cmds/md5fix.mjs';
 import { runPrep } from './cmds/prep.mjs';
 import { runReconcileCmd } from './cmds/reconcile.mjs';
 import { runUploadCmd } from './cmds/upload.mjs';
+import { runHoldSubmitCmd } from './cmds/hold_submit.mjs';
 import { runCycle } from './cmds/cycle.mjs';
 import { runRun } from './cmds/run.mjs';
 import { runClearLocalCmd } from './cmds/clearlocal.mjs';
@@ -61,6 +62,7 @@ const COMMANDS = {
   delete:           { group: '流水线', run: runDeleteCmd, channel: 'free', danger: 'platform', help: '删过审/被拒副本腾槽（dry-run 默认）' },
   md5fix:           { group: '流水线', run: runMd5fixCmd, channel: 'free', danger: 'local',    help: '改哈希让被拒件能重传（纯本地）' },
   upload:           { group: '流水线', run: runUploadCmd, channel: 'free', danger: 'platform', help: '真上传：注入→等传完→提交→记账' },
+  'hold-submit':    { group: '流水线', run: runHoldSubmitCmd, channel: 'free', danger: 'platform', help: '上传后挂起，按 --delay-min 延迟确认提交' },
   reconcile:        { group: '流水线', run: runReconcileCmd, channel: 'free', danger: 'ledger', help: '对账 un-bump 幻影上传（dry-run 默认）' },
   // ── 编排 ──
   prep:             { group: '编排', run: runPrep,        channel: 'free', danger: 'platform', help: 'sync→delete→md5fix（备料不传；delete 段 dry-run）' },
@@ -76,6 +78,7 @@ const COMMANDS = {
   'whoami-paid':    { group: '主管', run: runWhoami,       channel: 'paid', danger: 'browser', tier: 'super', help: '检查付费通道标签/会话（不回填账户名）' },
   'sync-paid':      { group: '主管', run: runSyncCmd,      channel: 'paid', danger: 'ledger', tier: 'super', help: '拉付费通道审核归台账' },
   'upload-paid':    { group: '主管', run: runUploadCmd,    channel: 'paid', danger: 'platform', tier: 'super', help: '付费通道真上传：注入→提交→记账' },
+  'hold-submit-paid': { group: '主管', run: runHoldSubmitCmd, channel: 'paid', danger: 'platform', tier: 'super', help: '付费通道上传后挂起，按 --delay-min 延迟确认提交' },
   'reconcile-paid': { group: '主管', run: runReconcileCmd, channel: 'paid', danger: 'ledger', tier: 'super', help: '付费通道对账 un-bump 幻影上传' },
   'monitor-paid':   { group: '主管', run: runMonitor,      channel: 'paid', danger: 'read', tier: 'super', help: '旁路录制付费通道网络请求到文件' },
   'monitor-report-paid': { group: '主管', run: runStatsCmd, channel: 'paid', danger: 'read', tier: 'super', help: '读付费通道 monitor 录制报表', aliases: ['stats-paid', 'traffic-paid'] },
@@ -83,8 +86,6 @@ const COMMANDS = {
   'run-both':       { group: '主管', run: runRun,         channel: 'both', danger: 'platform', tier: 'super', passChannels: true, help: 'free+paid 双通道并发飞轮' },
   'cycle-paid':     { group: '主管', run: runCycle,       channel: 'paid', danger: 'platform', tier: 'super', help: '付费多轮', aliases: ['deliver-round'] },
   'delete-paid':    { group: '主管', run: runDeleteCmd,   channel: 'paid', danger: 'platform', tier: 'super', help: '付费腾槽（dry-run 默认）', aliases: ['sweep'] },
-  // ── 桩（隐藏，调用报未实现）──
-  'hold-submit':    { group: '桩', channel: 'free', danger: 'platform', impl: false, help: '择时挂起提交（未实现）' },
 };
 
 // 别名表（旧名 → 规范名）。
@@ -93,7 +94,7 @@ for (const [name, c] of Object.entries(COMMANDS)) for (const a of (c.aliases || 
 
 // ★A2: 取值 flag。其余 `--xxx` 仍是布尔。
 const VALUE_FLAGS = new Set([
-  'seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min', 'poll-floor', 'poll-ceil', 'full-sync', 'batch',
+  'seconds', 'out', 'file', 'channel', 'rounds', 'round-wait', 'grace-min', 'poll-floor', 'poll-ceil', 'full-sync', 'batch', 'delay-min',
   'as', 'email', 'pwd',
   'free-aavid', 'free-plan', 'free-port', 'free-max',
   'paid-aavid', 'paid-plan', 'paid-port', 'paid-max',
