@@ -58,6 +58,8 @@ function run(args, env = {}) {
     WEILAI_SUPERVISOR: '',
     WEILAI_LICENSE_PUBLIC_KEY: '',
     WEILAI_LICENSE_PUBLIC_KEY_DER_B64: '',
+    WEILAI_OPENAI_API_KEY: '',
+    OPENAI_API_KEY: '',
   };
   return spawnSync(NODE, [CLI, ...args], {
     cwd: ROOT,
@@ -150,6 +152,52 @@ console.log('✓ paid 包装命令未解锁均 E_USAGE');
   r = assertExit(['delete-paid', '--apply', '--json'], 2, 'delete-paid --apply 应要求 paid.delete 权限', LICENSE_ENV);
   assert.ok(r.stderr.includes('paid.delete'), 'delete-paid --apply 应提示缺少 paid.delete 权限');
   console.log('✓ supervisor token + 默认120分钟/全天解锁/手动上锁符合预期');
+}
+
+{
+  const now = Math.floor(Date.now() / 1000);
+  assertExit(['auth', 'install-token', signedToken({ exp: now - 10 }), '--json'], 2, '过期 auth token 应拒绝', LICENSE_ENV);
+  assertExit(['auth', 'install-token', signedToken({ aud: 'other-aud' }), '--json'], 2, 'aud 不匹配 auth token 应拒绝', LICENSE_ENV);
+  assertExit(['auth', 'install-token', signedToken({ nbf: now + 3600 }), '--json'], 2, 'nbf 未生效 auth token 应拒绝', LICENSE_ENV);
+
+  const apiToken = signedToken({ features: ['api.openai'], secrets: ['openai.apiKey'] });
+  let r = assertExit(['auth', 'install-token', apiToken, '--json'], 0, 'auth install-token 应安装 api token', LICENSE_ENV);
+  let installed = JSON.parse(r.stdout);
+  assert.ok(installed.license.features.includes('api.openai'), 'auth install-token 应保留 api.openai 权限');
+  assert.ok(installed.license.secrets.includes('openai.apiKey'), 'auth install-token 应保留 secret 声明');
+
+  r = assertExit(['auth', 'status', '--json'], 0, 'auth status 应返回授权状态', LICENSE_ENV);
+  let st = JSON.parse(r.stdout);
+  assert.strictEqual(st.authorized, true, 'auth status 应 authorized=true');
+  assert.ok(st.secrets.includes('openai.apiKey'), 'auth status 应显示 secret 摘要');
+
+  r = assertExit(['auth', 'secrets', '--json'], 0, 'auth secrets 应列出声明 secret', LICENSE_ENV);
+  let secrets = JSON.parse(r.stdout);
+  assert.strictEqual(secrets.secrets[0].name, 'openai.apiKey', 'auth secrets 应列 openai.apiKey');
+  assert.strictEqual(secrets.secrets[0].configured, false, '未设 BYOK 时 configured=false');
+
+  assertExit(['auth', 'resolve', 'openai.apiKey', '--json'], 20, '未设 BYOK 时 auth resolve 应 E_CONFIG', LICENSE_ENV);
+
+  const rawKey = 'sk-test-abcdef1234567890';
+  r = assertExit(['auth', 'resolve', 'openai.apiKey', '--json'], 0, '设置 BYOK 后 auth resolve 应成功', { ...LICENSE_ENV, WEILAI_OPENAI_API_KEY: rawKey });
+  const resolved = JSON.parse(r.stdout);
+  assert.strictEqual(resolved.secret.name, 'openai.apiKey', 'auth resolve 应返回 secret 名');
+  assert.strictEqual(resolved.secret.source, 'WEILAI_OPENAI_API_KEY', 'auth resolve 应返回 BYOK 来源');
+  assert.ok(resolved.secret.masked && !resolved.secret.value, 'CLI JSON 不应返回明文 value');
+  assert.ok(!r.stdout.includes(rawKey), 'CLI 输出不应包含完整 API key');
+
+  const noSecretToken = signedToken({ features: ['api.openai'], secrets: [] });
+  assertExit(['auth', 'install-token', noSecretToken, '--json'], 0, '无 secret 声明 token 可安装', LICENSE_ENV);
+  r = assertExit(['auth', 'resolve', 'openai.apiKey', '--json'], 2, '缺少 secret 声明应 E_USAGE', { ...LICENSE_ENV, WEILAI_OPENAI_API_KEY: rawKey });
+  assert.ok(r.stderr.includes('未声明 secret'), '缺少 secret 声明应说明原因');
+
+  const noApiToken = signedToken({ features: ['paid.write'], secrets: ['openai.apiKey'] });
+  assertExit(['auth', 'install-token', noApiToken, '--json'], 0, '无 api.openai 权限 token 可安装', LICENSE_ENV);
+  r = assertExit(['auth', 'resolve', 'openai.apiKey', '--json'], 2, '缺少 api.openai 权限应 E_USAGE', { ...LICENSE_ENV, WEILAI_OPENAI_API_KEY: rawKey });
+  assert.ok(r.stderr.includes('api.openai'), '缺少 api.openai 权限应说明原因');
+
+  assertExit(['supervisor', 'status', '--json'], 0, 'supervisor 兼容入口仍应可用', LICENSE_ENV);
+  console.log('✓ auth token 验签 / secrets / BYOK masked 解析符合预期');
 }
 
 for (const [flag, value] of [['--batch', 'abc'], ['--poll-floor', '0'], ['--poll-ceil', '-1'], ['--full-sync', '1.5']]) {

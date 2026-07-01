@@ -26,6 +26,7 @@ import { runWhoami } from './cmds/whoami.mjs';
 import { runDoctor } from './cmds/doctor.mjs';
 import { runInspect } from './cmds/inspect.mjs';
 import { runLogin } from './cmds/login.mjs';
+import { runAuth } from './cmds/auth.mjs';
 import { runSupervisor } from './cmds/supervisor.mjs';
 import { channelRegistry, labelToId } from '../lib/config.mjs';
 import { supervisorAuthStatus, supervisorUnlocked } from '../lib/tier.mjs';
@@ -72,7 +73,8 @@ const COMMANDS = {
   // ── 维护 ──
   config:           { group: '维护', run: runConfigCmd,   channel: 'raw',  danger: 'local',    help: '读/改配置旋钮（get/set；set dry-run 默认）' },
   'clear-local':    { group: '维护', run: runClearLocalCmd, channel: 'none', danger: 'local',  help: '清本地源 + md5fix 孤儿副本（dry-run 默认）' },
-  supervisor:       { group: '维护', run: runSupervisor,   channel: 'none', danger: 'local',    help: '主管 token / 临时解锁 / 全天解锁 / 上锁 / 状态' },
+  auth:             { group: '维护', run: runAuth,         channel: 'none', danger: 'local',    help: '授权 token / session / secrets / BYOK 解析' },
+  supervisor:       { group: '维护', run: runSupervisor,   channel: 'none', danger: 'local',    help: '主管 token / 临时解锁 / 全天解锁 / 上锁 / 状态（auth 兼容入口）' },
   // ── 主管级（默认隐藏 + 解锁才可跑）──
   'ready-paid':     { group: '主管', run: runReady,        channel: 'paid', danger: 'browser', tier: 'super', help: '付费通道收敛到上传就绪' },
   'open-paid':      { group: '主管', run: runOpen,         channel: 'paid', danger: 'browser', tier: 'super', help: '只启动付费通道 Chrome 实例、不收敛' },
@@ -233,7 +235,7 @@ async function main() {
       const feature = requiredSupervisorFeature(cmd, entry, flags);
       if (!supervisorUnlocked(feature)) {
         const st = supervisorAuthStatus(feature);
-        writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n原因：${st.reason || '主管锁未解锁'}\n解锁：先 \`weilai supervisor install-token <token>\`，再 \`weilai supervisor unlock\`（默认 120 分钟）或 \`weilai supervisor unlock --all-day\`。`);
+        writeErr(`[E_USAGE] \`${cmd}\` 是主管级（付费投放通道）命令，默认锁定。\n原因：${st.reason || '主管锁未解锁'}\n解锁：先 \`weilai auth install-token <token>\`，再 \`weilai auth unlock\`（默认 120 分钟）或 \`weilai auth unlock --all-day\`。`);
         process.exit(EXIT.USAGE);
       }
     }

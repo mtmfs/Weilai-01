@@ -43,7 +43,7 @@ Weilai-01 把「素材过审」拆成一组可重跑、可对账、可被 AI/非
 | paid 删除 | 可用但谨慎 | `delete-paid` / `sweep`，dry-run 默认，真删需 `--apply` |
 | 冷登录 | 半残 | 仍依赖暖 profile，详见工程总报告 |
 | 分发 | 未产品化 | example 配置已准备，真实 `system.json` / `channels/*.json` 本机持有 |
-| 主管锁 | 已实装轻量版 | 签名主管 token + 临时 session；默认解锁 120 分钟，可 `--all-day` 全天解锁 |
+| 授权认证器 | 已实装架构版 | `auth` 统一管理 token / session / secrets；`supervisor` 仍作兼容入口 |
 
 ---
 
@@ -83,15 +83,24 @@ node bin/weilai.mjs sync paid
 
 ### paid 主管闸
 
-任何 paid 操作都要先安装主管 token，再显式解锁：
+任何 paid 操作都要先安装授权 token，再显式解锁：
 
 ```powershell
-node bin/weilai.mjs supervisor install-token <token>
-node bin/weilai.mjs supervisor unlock
+node bin/weilai.mjs auth install-token <token>
+node bin/weilai.mjs auth unlock
 node bin/weilai.mjs upload-paid
 ```
 
-`supervisor unlock` 默认解锁 120 分钟；主管需要长跑时可用 `supervisor unlock --all-day` 解锁 24 小时。跑完可用 `supervisor lock` 手动上锁。
+`auth unlock` 默认解锁 120 分钟；主管需要长跑时可用 `auth unlock --all-day` 解锁 24 小时。跑完可用 `auth lock` 手动上锁。旧 `supervisor ...` 命令仍可用。
+
+API key / BYOK 架构入口：
+
+```powershell
+node bin/weilai.mjs auth secrets
+node bin/weilai.mjs auth resolve openai.apiKey
+```
+
+`auth resolve` 默认只显示 masked key；第一版只支持 BYOK 环境变量（如 `WEILAI_OPENAI_API_KEY` / `OPENAI_API_KEY`），不会从 token 中释放真实 API key。
 
 普通 `--help` 不显示主管级命令；查看全集：
 
@@ -141,7 +150,7 @@ node bin/weilai.mjs status
 ### paid 投放
 
 ```powershell
-node bin/weilai.mjs supervisor unlock
+node bin/weilai.mjs auth unlock
 node bin/weilai.mjs ready-paid
 node bin/weilai.mjs sync-paid
 node bin/weilai.mjs upload-paid
@@ -150,14 +159,14 @@ node bin/weilai.mjs upload-paid
 持续跑 paid：
 
 ```powershell
-node bin/weilai.mjs supervisor unlock --all-day
+node bin/weilai.mjs auth unlock --all-day
 node bin/weilai.mjs run-paid
 ```
 
 free + paid 双通道：
 
 ```powershell
-node bin/weilai.mjs supervisor unlock --all-day
+node bin/weilai.mjs auth unlock --all-day
 node bin/weilai.mjs run-both
 ```
 
@@ -207,7 +216,7 @@ node bin/weilai.mjs monitor-report
 | `run` | `flywheel` | free 飞轮 | 写平台 |
 | `clear-local [--apply]` | - | 清本地源和 md5fix 孤儿副本 | 默认 dry-run |
 | `config get/set ...` | - | 读写配置旋钮 | set 默认 dry-run |
-| `supervisor <status|install-token|unlock|lock>` | - | 主管 token 与临时解锁 | 默认 120 分钟，`--all-day` 为 24 小时 |
+| `auth <status|install-token|unlock|lock|secrets|resolve>` | `supervisor` 兼容入口 | 授权 token、临时解锁、BYOK secret 解析 | 默认 120 分钟，`--all-day` 为 24 小时 |
 
 ### 主管级 paid
 
@@ -273,7 +282,7 @@ node bin/weilai.mjs config set free maxUploads 7 --apply
 
 1. **绝不杀 Chrome**：不要用 `Stop-Process chrome` 或 `taskkill /IM chrome.exe`。只用 `close` / `close-paid`。
 2. **先 dry-run 再 apply**：`delete`、`clear-local`、`reconcile` 默认只打印清单。
-3. **paid 必须解锁**：任何 paid 操作都要主管 token + session；默认 `supervisor unlock` 120 分钟，长跑用 `--all-day`，跑完可 `supervisor lock`。
+3. **paid 必须解锁**：任何 paid 操作都要授权 token + session；默认 `auth unlock` 120 分钟，长跑用 `--all-day`，跑完可 `auth lock`。
 4. **命令行保持 ASCII**：中文业务值写 JSON；`inspect <名字>` 是只读例外。
 5. **失败靠重跑续跑**：台账是检查点，不要靠手改平台状态“修复”。
 6. **挂起提交先小窗口验证**：`hold-submit` 当前按 `--delay-min` 明确延迟，已实测 10 分钟窗口；更长择时窗口要先跑探针。

@@ -63,7 +63,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 
 1. **绝不杀 chrome**：禁止 `Stop-Process -Name chrome` / `taskkill /IM chrome.exe`——那会杀光用户正常浏览器，且强杀产生 Crashpad 崩溃转储填满 C 盘。重置调试实例**只用 `weilai close`**（free）/ `weilai close-paid` 或 `weilai close --as paid`（paid·需解锁）。
 2. **破坏性操作默认 dry-run**：`delete` / `clear-local` 不加 `--apply` 只打印将做清单。**真删前必须**：先 dry-run 给用户看 → 用户确认 → 才 `--apply`。
-3. **paid = 真实花钱通道**：主管级、默认锁定。任何 paid 动作先确认、优先只读；**绝不擅自 `supervisor unlock` 跑 paid**，必须用户明确要求。
+3. **paid = 真实花钱通道**：主管级、默认锁定。任何 paid 动作先确认、优先只读；**绝不擅自 `auth unlock` 跑 paid**，必须用户明确要求。
 4. **命令行只用 ASCII**：中文（账户名/计划）写进 `channels/*.json` 或走 `login`；通道优先用 `free`/`paid` 标签，内部 id 仅在确有需要时用。**例外**：`inspect <名字>` 的搜索词可中文（只读台账，不碰平台）。
 5. **不确定就问，别瞎试**：尤其碰浏览器、碰 paid、碰删除时。
 
@@ -109,7 +109,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 | `clear-local [--apply]` | — | 清本地源 + md5fix 孤儿副本 | ⚠️ `--apply` 才删 |
 | `config get/set ...` | — | 读/改配置旋钮（set 默认 dry-run，`--apply` 落盘） | 写本地 |
 
-### 主管级（需主管 token + `supervisor unlock` 解锁）
+### 主管级（需授权 token + `auth unlock` 解锁）
 
 | 命令 | 别名 | 作用 | 状态 |
 |------|------|------|------|
@@ -136,7 +136,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 - **"持续跑 / 挂着自动跑"** → `run`（免费飞轮，日常主力；长跑让用户 `! node …run` 自跑）。
 - **"关掉浏览器"** → `close`（绝不杀进程）。
 - **"配置 / 换号"** → 让用户终端自跑 `! node …login`（交互式）。
-- **付费投放**（谨慎·主管级）→ 用户明确要求才 `supervisor unlock`（默认 120 分钟；长跑可 `--all-day`）+ 按场景用 `upload-paid` / `run-paid` / `run-both`。
+- **付费投放**（谨慎·主管级）→ 用户明确要求才 `auth unlock`（默认 120 分钟；长跑可 `--all-day`；`supervisor` 仍兼容）+ 按场景用 `upload-paid` / `run-paid` / `run-both`。
 
 ---
 
@@ -145,7 +145,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 裸命令默认走 **free**（免费测试通道），日常主力、安全。碰 **paid**（真实花钱通道）的命令是主管级、默认锁定：
 
 - 常用 paid 包装命令：`ready-paid/open-paid/close-paid/whoami-paid/sync-paid/upload-paid/reconcile-paid/monitor-paid/monitor-report-paid/run-paid/run-both/cycle-paid/delete-paid`；支持通道绑定的命令也可加 `--as paid`；
-- 都需先安装主管 token，再 `supervisor unlock` 解锁；默认 120 分钟，长跑可 `supervisor unlock --all-day` 解锁 24 小时；
+- 都需先安装授权 token，再 `auth unlock` 解锁；默认 120 分钟，长跑可 `auth unlock --all-day` 解锁 24 小时；
 - **绝不擅自解锁**，必须用户明确要投放。
 
 `status paid`、`config get paid ...` 这类 raw 参数命令保持空格写法，不支持 `--as`；`scan`、`inspect`、`clear-local` 这类无通道命令也不支持 `--as`。不新增 `status-paid/config-paid/prep-paid/md5fix-paid/passrate-paid`。`free`/`paid` 只是命令面标签，台账内部键来自本机 `channels/*.json`（当前常见为 `jie3`/`jie6`）。
@@ -179,7 +179,7 @@ node I:\weilai-01\bin\weilai.mjs <命令> [--json] [--apply] [--rounds N] [--as 
 
 **原因**：正常——付费号是主管级。
 
-**解决**：用户明确要投放时，先 `supervisor unlock`；长跑用 `supervisor unlock --all-day`。否则用 `run`（仅免费）。
+**解决**：用户明确要投放时，先 `auth unlock`；长跑用 `auth unlock --all-day`。否则用 `run`（仅免费）。
 
 #### Q3：`delete` 报"将删 0"
 
