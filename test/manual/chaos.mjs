@@ -3,12 +3,13 @@
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, appendFileSync } from 'node:fs';
 import { connect, connectBrowser } from '../../lib/cdp.mjs';
-import { probeAccount, probeUrl, probeView, listTabs } from '../../lib/session.mjs';
+import { probeUrl, probeView, listTabs } from '../../lib/session.mjs';
 import { guard } from '../../lib/guard.mjs';
 import { loadConfig } from '../../lib/config.mjs';
 
 const ROOT = 'I:\\weilai-01';
-const OUT = ROOT + '\\test-out';
+const runId = new Date().toISOString().replace(/[:.]/g, '-');
+const OUT = ROOT + `\\test-out\\manual-${runId}-chaos`;
 mkdirSync(OUT, { recursive: true });
 const LOG = OUT + '\\chaos-log.jsonl';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -61,10 +62,10 @@ async function S0_baseline() {
 async function S1_multiWindow() {
   await openDecoy(9222, J6); // 捷沅6 诱饵标签
   const r = cli(['ready', '--as', 'free']);
-  // 验诱饵 1862 标签账户仍是捷沅6、未被 jie3 操作搞乱
-  const decoy = await drive(9222, { aavid: A6 }, async cdp => probeAccount(cdp).catch(() => '?'));
-  const touchedWrong = r.code === 0 && decoy && decoy !== '捷沅6' && decoy !== '?';
-  rec({ scenario: 'S1_multiWindow', code: r.code, decoyAccount: decoy, BUG: touchedWrong ? 'jie3 操作疑似动到诱饵 1862' : null, ok: r.code === 0 && !touchedWrong });
+  // 验诱饵 1862 标签未被 jie3 操作导航搞乱（账户名探针已退役，改用 URL 判据：标签仍含 aavid=A6）
+  const decoyUrl = await drive(9222, { aavid: A6 }, async cdp => probeUrl(cdp).catch(() => ''));
+  const touchedWrong = r.code === 0 && decoyUrl && !String(decoyUrl).replace(/&amp;/g, '&').includes('aavid=' + A6);
+  rec({ scenario: 'S1_multiWindow', code: r.code, decoyUrl, BUG: touchedWrong ? 'jie3 操作疑似动到诱饵 1862' : null, ok: r.code === 0 && !touchedWrong });
 }
 async function S2_navDisrupt() {
   const before = await nav(9222, { aavid: A3 }, 'about:blank', 3000);
@@ -95,9 +96,10 @@ async function S4_topLogin() {
 async function S5_driftAccount() {
   await nav(9222, { aavid: A3 }, J6, 7000); // 把"jie3 标签"导到 1862（模拟漂移）
   const r = cli(['ready', '--as', 'free']);
-  // ready 后应有干净的 1849 标签且账户=捷沅3；绝不在 1862 上操作
-  const j3 = await drive(9222, { aavid: A3 }, async cdp => probeAccount(cdp).catch(() => '?'));
-  rec({ scenario: 'S5_driftAccount', readyCode: r.code, jie3Account: j3, BUG: (j3 && j3 !== '捷沅3' && j3 !== '?') ? '1849 标签账户异常' : null, ok: r.code === 0 && (j3 === '捷沅3' || j3 === '?') });
+  // ready 后应有干净的 1849 标签（账户名探针已退役，改用 URL 判据：标签在位且含 aavid=A3）
+  const j3Url = await drive(9222, { aavid: A3 }, async cdp => probeUrl(cdp).catch(() => ''));
+  const drifted = r.code === 0 && j3Url && !String(j3Url).replace(/&amp;/g, '&').includes('aavid=' + A3);
+  rec({ scenario: 'S5_driftAccount', readyCode: r.code, jie3Url: j3Url, BUG: drifted ? '1849 标签疑似漂移' : null, ok: r.code === 0 && !drifted });
 }
 async function S6_popup() {
   await drive(9222, { aavid: A3 }, async cdp => cdp.ev(`(function(){const d=document.createElement('div');d.className='tools-vmok-plugin-modal__mask chaos-fake';d.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.4)';const x=document.createElement('span');x.className='tools-vmok-plugin-modal__close-icon';x.style.cssText='position:fixed;top:20px;right:20px;width:24px;height:24px;background:#fff';d.appendChild(x);document.body.appendChild(d);return 'injected';})()`));

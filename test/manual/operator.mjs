@@ -3,7 +3,8 @@
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { connectBrowser } from '../../lib/cdp.mjs';
-const ROOT = 'I:\\weilai-01', OUT = ROOT + '\\test-out'; mkdirSync(OUT, { recursive: true });
+const runId = new Date().toISOString().replace(/[:.]/g, '-');
+const ROOT = 'I:\\weilai-01', OUT = ROOT + `\\test-out\\manual-${runId}-operator`; mkdirSync(OUT, { recursive: true });
 const LOG = OUT + '\\operator.jsonl';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => new Date(); const ts = () => now().toTimeString().slice(0, 8);

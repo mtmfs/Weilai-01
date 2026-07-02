@@ -17,6 +17,7 @@ import { runHoldSubmitCmd } from './cmds/hold_submit.mjs';
 import { runCycle } from './cmds/cycle.mjs';
 import { runRun } from './cmds/run.mjs';
 import { runClearLocalCmd } from './cmds/clearlocal.mjs';
+import { runCleanArtifacts } from './cmds/clean_artifacts.mjs';
 import { runMonitor } from './cmds/monitor.mjs';
 import { runStatsCmd } from './cmds/stats.mjs';
 import { runPassrate } from './cmds/passrate.mjs';
@@ -28,12 +29,12 @@ import { runInspect } from './cmds/inspect.mjs';
 import { runLogin } from './cmds/login.mjs';
 import { runAuth } from './cmds/auth.mjs';
 import { runSupervisor } from './cmds/supervisor.mjs';
-import { channelRegistry, labelToId } from '../lib/config.mjs';
+import { channelRegistry, labelToId, loadSystem } from '../lib/config.mjs';
+import { readFlywheelStatus } from '../lib/lockfile.mjs';
 import { supervisorAuthStatus, supervisorUnlocked } from '../lib/tier.mjs';
-import { CODE_TO_EXIT } from '../lib/guard.mjs';
+import { CODE_TO_EXIT, EXIT } from '../lib/guard.mjs';
 import { out, writeText, writeErr } from '../lib/log.mjs';
 
-const EXIT = { OK: 0, USAGE: 2, RUNTIME: 1, CONFIG: 20 };
 const DANGER = { read: '🟢只读', local: '🔵写本地', browser: '🟡浏览器', ledger: '🔵写台账', platform: '🔴写平台' };
 
 // 命令注册表（声明式单一真源）。一张表同时驱动：分发 / 别名 / 主管闸 / 通道默认 / 分组危险 help。
@@ -73,6 +74,7 @@ const COMMANDS = {
   // ── 维护 ──
   config:           { group: '维护', run: runConfigCmd,   channel: 'raw',  danger: 'local',    help: '读/改配置旋钮（get/set；set dry-run 默认）' },
   'clear-local':    { group: '维护', run: runClearLocalCmd, channel: 'none', danger: 'local',  help: '清本地源 + md5fix 孤儿副本（dry-run 默认）' },
+  'clean-artifacts': { group: '维护', run: runCleanArtifacts, channel: 'none', danger: 'local', help: '清 telemetry/test/log 运行产物（dry-run 默认）' },
   auth:             { group: '维护', run: runAuth,         channel: 'none', danger: 'local',    help: '授权 token / session / secrets / BYOK 解析' },
   supervisor:       { group: '维护', run: runSupervisor,   channel: 'none', danger: 'local',    help: '主管 token / 临时解锁 / 全天解锁 / 上锁 / 状态（auth 兼容入口）' },
   // ── 主管级（默认隐藏 + 解锁才可跑）──
@@ -245,6 +247,15 @@ async function main() {
       if (flags.json) out({ command: cmd, implemented: false, note: entry.help });
       else writeText(`命令 \`${cmd}\` 尚未实现（桩）。说明：${entry.help}`);
       process.exit(CODE_TO_EXIT.E_NOT_IMPL);
+    }
+
+    // ★飞轮并发告警（仅告警不拒）：写台账/写平台的手动命令，若检测到飞轮在跑则提示。
+    // 文件锁已保证不丢数据；这里只提示"重复劳动/平台配额"。run* 走硬拒(单例)，不在此重复告警。
+    if ((entry.danger === 'ledger' || entry.danger === 'platform') && !entry.passChannels) {
+      try {
+        const st = readFlywheelStatus(loadSystem().project.ledgerPath + '.run.pid');
+        if (st && st.alive) writeErr(`⚠ 检测到飞轮在运行（pid=${st.pid}, 通道=${(st.channels || []).join('+') || '?'}）。手动 ${cmd} 会与飞轮并发写台账；文件锁保证不丢数据，注意重复劳动/平台配额。`);
+      } catch (e) { /* 配置坏不挡命令，命令自身会报错 */ }
     }
 
     const restPos = pos.slice(1);

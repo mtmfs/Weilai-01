@@ -4,7 +4,8 @@
 // SIGINT/SIGTERM 优雅停（等在途收尾，★绝不杀 Chrome）。
 import { join } from 'node:path';
 import { runFlywheel } from '../../lib/flywheel.mjs';
-import { ROOT, channelRegistry } from '../../lib/config.mjs';
+import { ROOT, channelRegistry, loadConfig } from '../../lib/config.mjs';
+import { acquireFlywheelSingleton, touchHeartbeat, releaseFlywheelSingleton } from '../../lib/lockfile.mjs';
 import { supervisorAuthStatus, supervisorUnlocked } from '../../lib/tier.mjs';
 import { log, enableFileLog } from '../../lib/log.mjs';
 
@@ -38,6 +39,14 @@ export async function runRun({ flags, channels: bound }) {
     const e = new Error(`飞轮含付费号 ${reg.delivId}（主管级·付费投放），默认锁定：${st.reason || '主管锁未解锁'}。先 \`weilai auth unlock\`，或用 \`run\`（仅免费）。`); e.code = 'E_USAGE'; throw e;
   }
 
+  // ★飞轮单例：起飞轮前（任何 Chrome 启动前）抢占 pidfile。已有存活飞轮 → E_SINGLETON(17)；stale(pid 死/心跳陈旧) → 抢占。
+  const ledgerPath = loadConfig(channels[0]).system.project.ledgerPath;
+  const pidfile = ledgerPath + '.run.pid';
+  acquireFlywheelSingleton(pidfile, { channels });
+  const heartbeat = setInterval(() => touchHeartbeat(pidfile), 30000); heartbeat.unref(); // 独立心跳（不挂 tick：tick 空闲退避可达 180-300s，会漏跳误判死）
+  const cleanupSingleton = () => { try { clearInterval(heartbeat); } catch (e) {} releaseFlywheelSingleton(pidfile); };
+  process.on('exit', cleanupSingleton); // 进程崩溃兜底（releaseFlywheelSingleton 仅删属本进程的 pidfile）
+
   // CLI 覆盖（其余取 system.json.daemon / flywheel.DAEMON_DEFAULTS）。
   const daemon = {};
   const pollFloor = positiveIntFlag(flags, 'poll-floor');
@@ -62,6 +71,10 @@ export async function runRun({ flags, channels: bound }) {
   process.on('SIGTERM', () => stop('SIGTERM'));
 
   log.step(`==== run 启动 ${new Date().toLocaleString()} · 通道 ${channels.join('+')} · pid ${process.pid}（Ctrl-C 优雅停）====`);
-  await runFlywheel({ channels, log, daemon, signal: controller.signal });
+  try {
+    await runFlywheel({ channels, log, daemon, signal: controller.signal });
+  } finally {
+    cleanupSingleton(); // 优雅停/异常退出都释放 pidfile
+  }
   log.step(`==== run 结束 ${new Date().toLocaleString()} · pid ${process.pid} ====`);
 }

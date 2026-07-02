@@ -28,17 +28,13 @@
   },
   "timeouts": {
     "perFileNoProgressSec": 8,
-    "batchStallSec": 120,
-    "keepAliveSec": 12,
     "pollSec": 4,
     "patientMaxMin": 15,
     "rebumpWindowMin": 30,
     "reconcileGraceMin": 30
   },
   "concurrency": {
-    "ffmpegWorkers": 4,
-    "auditFetch": 4,
-    "delete": 3
+    "ffmpegWorkers": 4
   },
   "batch": {
     "maxPerBatch": 10

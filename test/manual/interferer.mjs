@@ -2,7 +2,8 @@
 // 跑到 14:00。安全：乱点排除破坏性文案；只动 jie3(免费/暂停)，不碰 jie6。
 import { connect, connectBrowser } from '../../lib/cdp.mjs';
 import { appendFileSync, mkdirSync } from 'node:fs';
-const ROOT = 'I:\\weilai-01', OUT = ROOT + '\\test-out'; mkdirSync(OUT, { recursive: true });
+const runId = new Date().toISOString().replace(/[:.]/g, '-');
+const ROOT = 'I:\\weilai-01', OUT = ROOT + `\\test-out\\manual-${runId}-interferer`; mkdirSync(OUT, { recursive: true });
 const LOG = OUT + '\\interferer.jsonl';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => new Date(); const ts = () => now().toTimeString().slice(0, 8);

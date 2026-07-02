@@ -215,6 +215,7 @@ node bin/weilai.mjs monitor-report
 | `cycle [--rounds N] [--apply]` | `test-round` | free 多轮收敛 | 写平台 |
 | `run` | `flywheel` | free 飞轮 | 写平台 |
 | `clear-local [--apply]` | - | 清本地源和 md5fix 孤儿副本 | 默认 dry-run |
+| `clean-artifacts [--apply]` | - | 清 telemetry/test/log 运行产物 | 默认 dry-run |
 | `config get/set ...` | - | 读写配置旋钮 | set 默认 dry-run |
 | `auth <status|install-token|unlock|lock|secrets|resolve>` | `supervisor` 兼容入口 | 授权 token、临时解锁、BYOK secret 解析 | 默认 120 分钟，`--all-day` 为 24 小时 |
 
@@ -281,7 +282,7 @@ node bin/weilai.mjs config set free maxUploads 7 --apply
 ## 安全边界
 
 1. **绝不杀 Chrome**：不要用 `Stop-Process chrome` 或 `taskkill /IM chrome.exe`。只用 `close` / `close-paid`。
-2. **先 dry-run 再 apply**：`delete`、`clear-local`、`reconcile` 默认只打印清单。
+2. **先 dry-run 再 apply**：`delete`、`clear-local`、`clean-artifacts`、`reconcile` 默认只打印清单。
 3. **paid 必须解锁**：任何 paid 操作都要授权 token + session；默认 `auth unlock` 120 分钟，长跑用 `--all-day`，跑完可 `auth lock`。
 4. **命令行保持 ASCII**：中文业务值写 JSON；`inspect <名字>` 是只读例外。
 5. **失败靠重跑续跑**：台账是检查点，不要靠手改平台状态“修复”。
